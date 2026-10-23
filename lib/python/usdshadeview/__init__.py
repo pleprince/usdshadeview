@@ -92,6 +92,15 @@ BORDER_WIDGET_STYLE = f"""
     }}
 """
 
+SELECTED_NODE_STYLE = f"""
+    QWidget#ThisWidget {{
+        background-color: #454545;
+        border-color: {UIColors.GOLD.value};
+        border-width: 1px;
+        border-style: solid;
+    }}
+"""
+
 AUX_BUTTON_STYLE = """
     QPushButton {
         color: #000;
@@ -468,6 +477,8 @@ class GraphNode(QtWidgets.QFrame):
     def __init__(self):
         super().__init__()
 
+        self.selected = False
+
         nodeLayout = QtWidgets.QVBoxLayout()
         nodeLayout.setContentsMargins(0, 0, 0, 0)
         nodeLayout.setSpacing(0)
@@ -475,6 +486,14 @@ class GraphNode(QtWidgets.QFrame):
 
         self.setStyleSheet(BORDER_WIDGET_STYLE)
         self.setObjectName("ThisWidget")
+
+    def SetSelected(self, selected):
+        if selected == self.selected:
+            return
+
+        self.selected = selected
+        self.setStyleSheet(
+            SELECTED_NODE_STYLE if selected else BORDER_WIDGET_STYLE)
 
     def AddHeader(self, title, subtitle, color, auxButtonText = '', auxButtonTooltip = ''):
         nameLabel = QtWidgets.QLabel(title)
@@ -1225,6 +1244,9 @@ def MakeConnectionWidget(startNode, outputName, endNode, inputName):
 
 
 class GraphView(QtWidgets.QGraphicsView):
+    MIN_SCALE = 0.05
+    MAX_SCALE = 20.0
+    KEY_ZOOM_STEP = 1.2
 
     def __init__(self):
         super().__init__()
@@ -1251,6 +1273,75 @@ class GraphView(QtWidgets.QGraphicsView):
 
             self.setViewport(glWidget)
 
+    def ZoomIn(self):
+        self.ZoomBy(self.KEY_ZOOM_STEP)
+
+    def ZoomOut(self):
+        self.ZoomBy(1.0 / self.KEY_ZOOM_STEP)
+
+    def ZoomBy(self, factor, anchor=None):
+        currentScale = self.transform().m11()
+        if currentScale <= 0.0:
+            return
+
+        targetScale = currentScale * factor
+        if targetScale < self.MIN_SCALE:
+            factor = self.MIN_SCALE / currentScale
+        elif targetScale > self.MAX_SCALE:
+            factor = self.MAX_SCALE / currentScale
+
+        if abs(factor - 1.0) < 1e-6:
+            return
+
+        if anchor is None:
+            anchor = self.viewport().rect().center()
+
+        oldPos = self.mapToScene(anchor)
+        self.scale(factor, factor)
+
+        # Scroll so the scene point under the anchor stays in place.
+        newViewPos = self.mapFromScene(oldPos)
+        delta = newViewPos - anchor
+        self.horizontalScrollBar().setValue(
+            self.horizontalScrollBar().value() + delta.x())
+        self.verticalScrollBar().setValue(
+            self.verticalScrollBar().value() + delta.y())
+
+    def wheelEvent(self, event):
+        angleDelta = event.angleDelta().y()
+        pixelDelta = event.pixelDelta().y()
+
+        if angleDelta != 0:
+            factor = 1.0015 ** angleDelta
+        elif pixelDelta != 0:
+            factor = 1.005 ** pixelDelta
+        else:
+            event.ignore()
+            return
+
+        # Keep trackpad momentum from jumping the zoom level too far.
+        factor = max(0.8, min(1.25, factor))
+
+        if hasattr(event, "position"):
+            anchor = event.position().toPoint()
+        else:
+            anchor = event.pos()
+
+        self.ZoomBy(factor, anchor)
+        event.accept()
+
+    def FrameItems(self, items):
+        rect = QtCore.QRectF()
+        for item in items:
+            rect = rect.united(item.sceneBoundingRect())
+
+        if rect.isEmpty():
+            return
+
+        margin = 40.0
+        rect.adjust(-margin, -margin, margin, margin)
+        self.fitInView(rect, QtCore.Qt.KeepAspectRatio)
+
     def drawBackground(self, painter, rect):
         # Fill background; needed for HW acceleleration
         viewportRect = self.viewport().rect()
@@ -1262,13 +1353,14 @@ class GraphView(QtWidgets.QGraphicsView):
         painter.setPen(lineColor)
         lineSpacing = 28
 
-        # -1 to avoid double border
-        lineX = rect.left() - 1
+        # Snap lines to scene-space multiples so the grid moves with the
+        # nodes instead of following the viewport.
+        lineX = rect.left() - rect.left() % lineSpacing
         while lineX < rect.right():
             painter.drawLine(lineX, rect.bottom(), lineX, rect.top())
             lineX += lineSpacing
 
-        lineY = rect.top() - 1
+        lineY = rect.top() - rect.top() % lineSpacing
         while lineY < rect.bottom():
             painter.drawLine(rect.left(), lineY, rect.right(), lineY)
             lineY += lineSpacing
@@ -1493,6 +1585,9 @@ class GraphWidget(QtWidgets.QWidget):
             self.AddNodeConnections(upstreamPrim, upstreamInputs, depth + 1)
 
     def PopulateScene(self, nodeGraph, selectedOutput):
+        self.ClearSelection()
+        self.nodeFilterTargets.clear()
+
         self.nodeGraph = nodeGraph
         self.scene = QtWidgets.QGraphicsScene(self)
 
@@ -1530,9 +1625,16 @@ class GraphWidget(QtWidgets.QWidget):
         self.scene.addItem(graphWidget)
 
         self.graphView.setScene(self.scene)
+        self.UpdateNodeFilterTargets()
 
     def __init__(self, ngChangeCallback):
         super().__init__()
+
+        self.selectedProxies = []
+        self.nodeFilterTargets = {}
+        self.widgetMap = {}
+        self.parentNgWidgetMap = {}
+        self.scene = None
 
         graphView = GraphView()
 
@@ -1542,6 +1644,140 @@ class GraphWidget(QtWidgets.QWidget):
         layout = QtWidgets.QVBoxLayout()
         layout.addWidget(graphView)
         self.setLayout(layout)
+
+        app = QtWidgets.QApplication.instance()
+        if app is not None:
+            app.installEventFilter(self)
+
+    def GetAllNodeProxies(self):
+        return (list(self.widgetMap.values())
+                + list(self.parentNgWidgetMap.values()))
+
+    def UpdateNodeFilterTargets(self):
+        for proxy in self.GetAllNodeProxies():
+            node = proxy.widget()
+            if node is None:
+                continue
+
+            self.nodeFilterTargets[node] = proxy
+            for child in node.findChildren(QtWidgets.QWidget):
+                self.nodeFilterTargets[child] = proxy
+
+    def UpdateSelectionStyles(self):
+        selected = self.selectedProxies
+        for proxy in self.GetAllNodeProxies():
+            node = proxy.widget()
+            if isinstance(node, GraphNode):
+                node.SetSelected(proxy in selected)
+
+    def ClearSelection(self):
+        if not self.selectedProxies:
+            return
+
+        self.selectedProxies = []
+        self.UpdateSelectionStyles()
+
+    def SelectNode(self, proxy, modifiers):
+        if modifiers & QtCore.Qt.ShiftModifier:
+            if proxy in self.selectedProxies:
+                self.selectedProxies.remove(proxy)
+            else:
+                self.selectedProxies.append(proxy)
+        else:
+            self.selectedProxies = [proxy]
+
+        self.UpdateSelectionStyles()
+
+    def FrameSelected(self):
+        self.FrameNodes(self.selectedProxies)
+
+    def FrameAll(self):
+        self.FrameNodes(self.GetAllNodeProxies())
+
+    def FrameNodes(self, proxies):
+        if self.scene is None:
+            return
+
+        proxies = [p for p in proxies if p.scene() is self.scene]
+        if proxies:
+            self.graphView.FrameItems(proxies)
+
+    def IsFrameKey(self, event):
+        return (event.key() in (QtCore.Qt.Key.Key_F, QtCore.Qt.Key.Key_A)
+                and event.modifiers() in (QtCore.Qt.NoModifier,
+                                          QtCore.Qt.KeypadModifier))
+
+    def IsZoomKey(self, event):
+        zoomKeys = (QtCore.Qt.Key.Key_Plus, QtCore.Qt.Key.Key_Equal,
+                    QtCore.Qt.Key.Key_Minus, QtCore.Qt.Key.Key_Underscore)
+        return (event.key() in zoomKeys
+                and event.modifiers() in (QtCore.Qt.NoModifier,
+                                          QtCore.Qt.ShiftModifier,
+                                          QtCore.Qt.KeypadModifier))
+
+    def IsPanelKey(self, event):
+        return self.IsFrameKey(event) or self.IsZoomKey(event)
+
+    def IsGraphEventTarget(self, obj):
+        if obj is self or obj is self.graphView:
+            return True
+        if obj is self.graphView.viewport():
+            return True
+        return obj in self.nodeFilterTargets
+
+    def IsGraphUnderMouse(self):
+        app = QtWidgets.QApplication.instance()
+        if app is not None and app.activeModalWidget() is not None:
+            return False
+
+        widget = QtWidgets.QApplication.widgetAt(QtGui.QCursor.pos())
+        if widget is None:
+            return False
+
+        return (widget is self.graphView.viewport()
+                or widget in self.nodeFilterTargets)
+
+    def IsGraphKeyTarget(self, obj):
+        return self.IsGraphEventTarget(obj) or self.IsGraphUnderMouse()
+
+    def HandleKeyPress(self, event):
+        key = event.key()
+
+        if key == QtCore.Qt.Key.Key_F:
+            self.FrameSelected()
+        elif key == QtCore.Qt.Key.Key_A:
+            self.FrameAll()
+        elif key in (QtCore.Qt.Key.Key_Plus, QtCore.Qt.Key.Key_Equal):
+            self.graphView.ZoomIn()
+        elif key in (QtCore.Qt.Key.Key_Minus,
+                     QtCore.Qt.Key.Key_Underscore):
+            self.graphView.ZoomOut()
+
+        return True
+
+    def IsNodeItem(self, item):
+        return any(item is proxy for proxy in self.GetAllNodeProxies())
+
+    def eventFilter(self, obj, event):
+        eventType = event.type()
+
+        if eventType == QtCore.QEvent.Type.ShortcutOverride:
+            if self.IsPanelKey(event) and self.IsGraphKeyTarget(obj):
+                event.accept()
+                return True
+        elif eventType == QtCore.QEvent.Type.KeyPress:
+            if self.IsPanelKey(event) and self.IsGraphKeyTarget(obj):
+                return self.HandleKeyPress(event)
+        elif eventType == QtCore.QEvent.Type.MouseButtonPress:
+            if (event.button() == QtCore.Qt.LeftButton
+                    and obj is self.graphView.viewport()):
+                item = self.graphView.itemAt(event.pos())
+                if self.IsNodeItem(item):
+                    self.SelectNode(item, event.modifiers())
+                else:
+                    self.ClearSelection()
+
+        return super().eventFilter(obj, event)
 
 
 class GraphDockWidget(QtWidgets.QDockWidget):
@@ -1566,6 +1802,15 @@ class GraphDockWidget(QtWidgets.QDockWidget):
             image = self.graphWidget.RenderSceneToImage()
             image.save(filePath)
 
+    def AddViewAction(self, menu, text, shortcut, callback):
+        action = menu.addAction(text)
+        action.setShortcut(QtGui.QKeySequence(shortcut))
+        # The graph keys are handled contextually by GraphWidget; keeping
+        # this scoped avoids clashing with usdview's global shortcuts.
+        action.setShortcutContext(QtCore.Qt.WidgetShortcut)
+        action.triggered.connect(lambda *args: callback())
+        return action
+
     def UpdateMenuBar(self):
         menuBar = QtWidgets.QMenuBar(self)
         # On macOS a native menu bar is merged into usdview's global one.
@@ -1575,6 +1820,17 @@ class GraphDockWidget(QtWidgets.QDockWidget):
         if self.historyStack:
             a = viewMenu.addAction("Back to Parent")
             a.triggered.connect(lambda *args: self.BackToParentNodeGraph())
+            viewMenu.addSeparator()
+
+        self.AddViewAction(viewMenu, "Frame Selected", "F",
+                           self.graphWidget.FrameSelected)
+        self.AddViewAction(viewMenu, "Frame All", "A",
+                           self.graphWidget.FrameAll)
+        self.AddViewAction(viewMenu, "Zoom In", "+",
+                           self.graphWidget.graphView.ZoomIn)
+        self.AddViewAction(viewMenu, "Zoom Out", "-",
+                           self.graphWidget.graphView.ZoomOut)
+        viewMenu.addSeparator()
 
         outputMenu = viewMenu.addMenu("Filter Output")
 

@@ -55,6 +55,8 @@ The panel can be docked anywhere in the usdview main window, floated as a separa
 
 The network shown in the panel has a layout depending on network topology, and node colors are based on the classification (USDA, MaterialX, MDL, OSL, node graph, unknown). Child node graphs can be entered using the "E" button.
 
+Nodes can be selected by clicking them; hold **Shift** to select multiple. Press **F** to frame the selected nodes and **A** to frame the whole graph. Use the mouse wheel (centered on the cursor) or the **+** and **-** keys to zoom in and out. These shortcuts only apply while the panel is focused or under the cursor, so they do not interfere with usdview's own **F** shortcut.
+
 It is also possible to **right click** value widgets, which exposes following actions:
 
 <img width="277" height="144" src="https://github.com/user-attachments/assets/d6841521-b734-45d0-92fb-c391674ab653" />
