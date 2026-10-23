@@ -41,23 +41,25 @@ For [Advanced Instructions](#advanced-installation) see below.
 
 ### 1. Node Graphs
 
-usdshadeview visualizes [UsdShade NodeGraphs](https://openusd.org/release/api/class_usd_shade_node_graph.html) and Materials (which are specialized node graphs) in an interactive Qt dialog:
+usdshadeview visualizes [UsdShade NodeGraphs](https://openusd.org/release/api/class_usd_shade_node_graph.html) and Materials (which are specialized node graphs) in a dockable usdview panel:
 
 <p align="middle">
   <img width="1959" height="559" src="https://github.com/user-attachments/assets/0d686165-0eed-49ea-98f4-26b0d65a2b42" />
 </p>
 
-The dialog can be shown by **right clicking** a prim of one of both types, which brings up a new option in the context menu:
+The panel can be shown by **right clicking** a prim of one of both types, which brings up a new option in the context menu:
 
 <img width="484" height="330" src="https://github.com/user-attachments/assets/eaf5291b-cda6-4585-8dcd-6e4470c8fddf" />
 
-The network shown in the dialog has a layout depending on network topology, and node colors are based on the classification (USDA, MaterialX, MDL, OSL, node graph, unknown). Child node graphs can be entered using the "E" button.
+The panel can be docked anywhere in the usdview main window, floated as a separate window, or closed. Its docking layout and visibility are stored in usdview's preferences, so they are restored on the next launch. It can also be toggled from the usdview menu bar _Window_ → _UsdShade Node Graph_.
+
+The network shown in the panel has a layout depending on network topology, and node colors are based on the classification (USDA, MaterialX, MDL, OSL, node graph, unknown). Child node graphs can be entered using the "E" button.
 
 It is also possible to **right click** value widgets, which exposes following actions:
 
 <img width="277" height="144" src="https://github.com/user-attachments/assets/d6841521-b734-45d0-92fb-c391674ab653" />
 
-In the main graph dialog, the menu bar offers following features:
+In the main graph panel, the menu bar offers following features:
 - _View_ → _Filter Output_: filter nodes and connections to a single output
 - _Tools_ → _Bake to Texture_: (only for MaterialX materials) invoke UsdBakeMtlx
 - _Tools_ → _Export as Image_: save the scene with a transparent background

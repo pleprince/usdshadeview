@@ -23,6 +23,7 @@ from pxr.Usdviewq.primContextMenuItems import PrimContextMenuItem
 from pxr.Usdviewq.primContextMenu import PrimContextMenu
 from pxr.Usdviewq.qt import QtCore, QtGui, QtWidgets, QGLWidget, QGLFormat, GetPySideModule
 from pxr.Usdviewq.scalarTypes import ToClipboard, ToString
+from pxr.Usdviewq.settings import StateSource
 
 PySideModule = GetPySideModule()
 
@@ -1543,7 +1544,9 @@ class GraphWidget(QtWidgets.QWidget):
         self.setLayout(layout)
 
 
-class GraphDialog(QtWidgets.QDialog):
+class GraphDockWidget(QtWidgets.QDockWidget):
+    DOCK_OBJECT_NAME = "usdshadeviewDock"
+    DEFAULT_TITLE = "UsdShade Node Graph"
 
     def ShowBakeMtlxDialog(self):
         material = UsdShade.Material(self.nodeGraph)
@@ -1565,6 +1568,8 @@ class GraphDialog(QtWidgets.QDialog):
 
     def UpdateMenuBar(self):
         menuBar = QtWidgets.QMenuBar(self)
+        # On macOS a native menu bar is merged into usdview's global one.
+        menuBar.setNativeMenuBar(False)
 
         viewMenu = menuBar.addMenu("View")
         if self.historyStack:
@@ -1601,8 +1606,7 @@ class GraphDialog(QtWidgets.QDialog):
         exportAction = toolsMenu.addAction("Export as Image...")
         exportAction.triggered.connect(lambda *args: self.ShowExportAsImageDialog())
 
-        layout = self.layout()
-        layout.setMenuBar(menuBar)
+        self.contentLayout.setMenuBar(menuBar)
 
     def BackToParentNodeGraph(self):
         self.nodeGraph, self.selectedOutput = self.historyStack.pop()
@@ -1622,7 +1626,8 @@ class GraphDialog(QtWidgets.QDialog):
             outputName = self.selectedOutput.GetBaseName()
             outputStr = f' ({outputName})'
 
-        self.setWindowTitle(primPath + outputStr)
+        self.setWindowTitle(
+            f"{self.DEFAULT_TITLE}: {primPath}{outputStr}")
 
         self.graphWidget.PopulateScene(self.nodeGraph, self.selectedOutput)
 
@@ -1647,26 +1652,49 @@ class GraphDialog(QtWidgets.QDialog):
         self.nodeGraph = nodeGraph
         self.selectedOutput = self.GetDefaultOutput()
 
+        self.placeholderLabel.hide()
+        self.graphWidget.show()
+
         self.UpdateContentForOutput()
 
-    def __init__(self, mainWindow, nodeGraph):
-        super().__init__(mainWindow)
+    def __init__(self, mainWindow):
+        super().__init__(self.DEFAULT_TITLE, mainWindow)
+
+        self.setObjectName(self.DOCK_OBJECT_NAME)
+        self.setAllowedAreas(QtCore.Qt.AllDockWidgetAreas)
+        self.setFeatures(
+            QtWidgets.QDockWidget.DockWidgetClosable
+            | QtWidgets.QDockWidget.DockWidgetMovable
+            | QtWidgets.QDockWidget.DockWidgetFloatable)
+
+        contentWidget = QtWidgets.QWidget(self)
+        self.contentLayout = QtWidgets.QVBoxLayout(contentWidget)
+        self.contentLayout.setContentsMargins(0, 0, 0, 0)
+
+        self.placeholderLabel = QtWidgets.QLabel(
+            "Right-click a Material or NodeGraph prim and choose "
+            "\"Show Node Graph\".",
+            contentWidget)
+        self.placeholderLabel.setAlignment(QtCore.Qt.AlignCenter)
+        self.contentLayout.addWidget(self.placeholderLabel, 1)
 
         self.graphWidget = GraphWidget(self.SetNodeGraph)
-
-        layout = QtWidgets.QVBoxLayout()
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.addWidget(self.graphWidget)
-        self.setLayout(layout)
+        self.contentLayout.addWidget(self.graphWidget, 1)
+        self.setWidget(contentWidget)
+        self.graphWidget.hide()
 
         self.nodeGraph = None
         self.historyStack = [] # push (ng, output) when we traverse into child NG
-        self.SetNodeGraph(nodeGraph)
 
-        self.resize(1024, 768) # set default size
+        self.resize(800, 600) # set default size
+
+    def ShowNodeGraph(self, nodeGraph):
+        if nodeGraph != self.nodeGraph:
+            self.SetNodeGraph(nodeGraph)
+        self.show()
+        self.raise_()
 
         # On Windows there's a bug where the scroll bars initially don't show.
-        # I was not able to find any other workaround than this.
         if platform.system() == 'Windows':
             QtCore.QTimer.singleShot(0, self.ForceInitialResize)
 
@@ -1676,11 +1704,40 @@ class GraphDialog(QtWidgets.QDialog):
         self.resize(size)
 
 
+class UsdShadeViewDockState(StateSource):
+    """Persists the node graph dock layout in usdview's state file."""
+
+    def __init__(self, settings, mainWindow, dockWidget):
+        super().__init__(settings, "usdshadeview")
+
+        self._mainWindow = mainWindow
+        self._dockWidget = dockWidget
+
+        self.dockState = self.stateProperty("dockState", default="")
+        self.dockVisible = self.stateProperty("dockVisible", default=False)
+
+    def Restore(self):
+        if self.dockState:
+            state = QtCore.QByteArray.fromBase64(
+                self.dockState.encode("ascii"))
+            if not self._mainWindow.restoreState(state):
+                print("WARNING: failed to restore usdshadeview dock state",
+                      file=sys.stderr)
+
+        self._dockWidget.setVisible(self.dockVisible)
+
+    def onSaveState(self, state):
+        state["dockState"] = base64.b64encode(
+            self._mainWindow.saveState().data()).decode("ascii")
+        state["dockVisible"] = self._dockWidget.isVisible()
+
+
 class ShowUsdShadeGraphContextMenuItem(PrimContextMenuItem):
 
-    def __init__(self, appController, item, usdviewApi):
+    def __init__(self, appController, item, usdviewApi, viewContainer):
         super().__init__(appController, item)
         self.usdviewApi = usdviewApi
+        self.viewContainer = viewContainer
 
     def GetFocusedPrim(self):
         return self.usdviewApi.prim
@@ -1700,19 +1757,27 @@ class ShowUsdShadeGraphContextMenuItem(PrimContextMenuItem):
         if not outputs:
             return
 
-        dialog = GraphDialog(self._appController._mainWindow, nodeGraph)
-        dialog.show()
+        self.viewContainer.ShowNodeGraph(nodeGraph)
 
 
 class UsdShadeViewContainer(PluginContainer):
     SDR_NODES_COMMAND_NS = "UsdShadeView.SdrNodes"
+    TOGGLE_DOCK_COMMAND_NS = "UsdShadeView.ToggleDock"
 
     def registerPlugins(self, plugRegistry, usdviewApi):
         self.usdviewApi = usdviewApi
+        self.dockWidget = None
+        self.dockAction = None
+        self.dockState = None
         self.sdrNodesMenu = plugRegistry.registerCommandPlugin(
             self.SDR_NODES_COMMAND_NS,
             "List of Sdr nodes",
             lambda *args: None)
+        self.toggleDockCommand = plugRegistry.registerCommandPlugin(
+            self.TOGGLE_DOCK_COMMAND_NS,
+            "UsdShade Node Graph",
+            lambda *args: self.ToggleDock(),
+            "Show or hide the UsdShade node graph panel.")
 
     def configureView(self, plugRegistry, plugUIBuilder):
         windowMenu = plugUIBuilder.findOrCreateMenu("Window")
@@ -1735,10 +1800,47 @@ class UsdShadeViewContainer(PluginContainer):
                     lambda *args, n=ndId: OpenNodeDefDialog(n))
                 sdrNodeMenu.addItem(item)
 
+        self.CreateDockWidget(windowMenu)
         self.hijackPrimContextMenu()
+
+    def CreateDockWidget(self, windowMenu):
+        mainWindow = self.usdviewApi.qMainWindow
+
+        self.dockWidget = GraphDockWidget(mainWindow)
+        mainWindow.addDockWidget(
+            QtCore.Qt.RightDockWidgetArea, self.dockWidget)
+
+        self.dockAction = windowMenu.addItem(self.toggleDockCommand)
+        self.dockAction.setCheckable(True)
+        self.dockAction.setChecked(self.dockWidget.isVisible())
+        self.dockWidget.visibilityChanged.connect(
+            self.dockAction.setChecked)
+
+        self.dockState = UsdShadeViewDockState(
+            self.GetSettingsSource(), mainWindow, self.dockWidget)
+        self.dockState.Restore()
+
+    def GetSettingsSource(self):
+        getSettings = getattr(self.usdviewApi, "GetSettings", None)
+        if getSettings is not None:
+            return getSettings()
+        # Older usdview versions have no public accessor; the view
+        # settings are themselves a child state source of the settings.
+        return self.usdviewApi.dataModel.viewSettings
+
+    def ToggleDock(self):
+        if self.dockWidget.isVisible():
+            self.dockWidget.hide()
+        else:
+            self.dockWidget.show()
+            self.dockWidget.raise_()
+
+    def ShowNodeGraph(self, nodeGraph):
+        self.dockWidget.ShowNodeGraph(nodeGraph)
 
     def hijackPrimContextMenu(self):
         usdviewApi = self.usdviewApi
+        viewContainer = self
 
         oldInitMethod = PrimContextMenu.__init__
 
@@ -1748,7 +1850,8 @@ class UsdShadeViewContainer(PluginContainer):
             if not item:
                 return
 
-            menuItem = ShowUsdShadeGraphContextMenuItem(appController, item, usdviewApi)
+            menuItem = ShowUsdShadeGraphContextMenuItem(
+                appController, item, usdviewApi, viewContainer)
 
             action = self.addAction(menuItem.GetText())
             action.setEnabled(menuItem.IsEnabled())
