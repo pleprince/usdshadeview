@@ -8,7 +8,32 @@ A usdview plugin for inspecting UsdShade networks.
 
 ## Installation
 
-Copy the `lib` and `plugin` directories into your USD installation directory.
+Run the installer with the same Python interpreter your USD build uses:
+
+```sh
+python install.py
+```
+
+This auto-detects your USD installation (via the importable `pxr` package)
+and copies the plugin into the directories USD already scans by default:
+
+* `usdshadeview` next to `pxr` on the Python path (`lib/python` or
+  `lib/pythonX.Y/site-packages`) — importable by USD
+* `plugin/usd/usdshadeview` — registered via the install's
+  `plugin/usd/plugInfo.json` include glob
+
+usdview then picks up the plugin automatically, with no environment
+variables required. To target a specific install or to remove the plugin:
+
+```sh
+python install.py --usd-root /path/to/usd
+python install.py --uninstall
+```
+
+Pass `-v`/`--verbose` to print every file operation.
+
+Alternatively, copy the `lib` and `plugin` directories into your USD
+installation directory manually.
 
 For [Advanced Instructions](#advanced-installation) see below.
 
