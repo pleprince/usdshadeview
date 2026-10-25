@@ -510,7 +510,7 @@ class GraphNode(QtWidgets.QFrame):
         headerLayout.addLayout(nameTypeLayout)
         headerLayout.addStretch()
 
-        if auxButtonText != '':
+        if auxButtonText:
             auxButton = QtWidgets.QPushButton(auxButtonText)
             auxButton.setToolTip(auxButtonTooltip)
             auxButton.setStyleSheet(AUX_BUTTON_STYLE)
@@ -521,8 +521,7 @@ class GraphNode(QtWidgets.QFrame):
         headerFrame.setLayout(headerLayout)
         headerFrame.setStyleSheet(f"QFrame {{ background-color: {color.value}; color: #000; }}")
 
-        layout = self.layout()
-        layout.addWidget(headerFrame)
+        self.layout().addWidget(headerFrame)
 
 
 # Sets up a context menu on a value widget
@@ -1210,13 +1209,6 @@ class ConnectionWidget:
         self.SetStartEndPoints(startPos, endPos)
 
 
-# Unused, straight line style
-class LineConnectionWidget(ConnectionWidget, QtWidgets.QGraphicsLineItem):
-
-    def SetStartEndPoints(self, p1, p2):
-        self.setLine(QtCore.QLineF(p1, p2))
-
-
 # Bezier spline
 class SplineConnectionWidget(ConnectionWidget, QtWidgets.QGraphicsPathItem):
 
@@ -1237,10 +1229,6 @@ class SplineConnectionWidget(ConnectionWidget, QtWidgets.QGraphicsPathItem):
         path.cubicTo(controlPoint1, controlPoint2, p2)
 
         self.setPath(path)
-
-
-def MakeConnectionWidget(startNode, outputName, endNode, inputName):
-    return SplineConnectionWidget(startNode, outputName, endNode, inputName)
 
 
 class GraphView(QtWidgets.QGraphicsView):
@@ -1302,14 +1290,17 @@ class GraphView(QtWidgets.QGraphicsView):
         # Scroll so the scene point under the anchor stays in place.
         newViewPos = self.mapFromScene(oldPos)
         delta = newViewPos - anchor
-        self.horizontalScrollBar().setValue(
-            self.horizontalScrollBar().value() + delta.x())
-        self.verticalScrollBar().setValue(
-            self.verticalScrollBar().value() + delta.y())
+        self.ScrollBy(delta.x(), delta.y())
+
+    def ScrollBy(self, dx, dy):
+        hBar = self.horizontalScrollBar()
+        vBar = self.verticalScrollBar()
+        hBar.setValue(hBar.value() + dx)
+        vBar.setValue(vBar.value() + dy)
 
     def wheelEvent(self, event):
-        angleDelta = event.angleDelta().y()
         pixelDelta = event.pixelDelta().y()
+        angleDelta = event.angleDelta().y()
 
         if angleDelta != 0:
             factor = 1.0015 ** angleDelta
@@ -1368,6 +1359,27 @@ class GraphView(QtWidgets.QGraphicsView):
 
 class GraphWidget(QtWidgets.QWidget):
 
+    def __init__(self, ngChangeCallback):
+        super().__init__()
+
+        self.ngChangeCallback = ngChangeCallback
+
+        self.selectedProxies = []
+        self.nodeFilterTargets = {}
+        self.widgetMap = {}
+        self.parentNgWidgetMap = {}
+        self.scene = None
+
+        self.graphView = GraphView()
+
+        layout = QtWidgets.QVBoxLayout()
+        layout.addWidget(self.graphView)
+        self.setLayout(layout)
+
+        app = QtWidgets.QApplication.instance()
+        if app is not None:
+            app.installEventFilter(self)
+
     def RenderSceneToImage(self):
         scaleFactor = 4.0 # Higher values = larger resolution = less aliasing
 
@@ -1385,20 +1397,18 @@ class GraphWidget(QtWidgets.QWidget):
         return image
 
     # Store the nodes we encounter during traversal and their maximum depth
-    def UpdateNodeMap(self, prim, depth):
+    def UpdateNodeDepth(self, prim, depth):
         if prim in self.nodeMap:
-            (prim, oldDepth) = self.nodeMap[prim]
+            oldDepth = self.nodeMap[prim]
 
             # Already visited, abort traversal (optimization)
             if depth <= oldDepth:
                 return False
 
-            newDepth = max(oldDepth, depth)
-            self.nodeMap[prim] = (prim, newDepth)
-            self.maxDepth = max(self.maxDepth, newDepth)
-        else:
-            self.nodeMap[prim] = (prim, depth)
-            self.maxDepth = max(self.maxDepth, depth)
+            depth = max(oldDepth, depth)
+
+        self.nodeMap[prim] = depth
+        self.maxDepth = max(self.maxDepth, depth)
         return True
 
     # Returns the UsdShade.Input list of shaders and node graph prims
@@ -1437,7 +1447,7 @@ class GraphWidget(QtWidgets.QWidget):
             print("WARNING: maximum node graph depth reached", file=sys.stderr)
             return
 
-        if not self.UpdateNodeMap(prim, depth):
+        if not self.UpdateNodeDepth(prim, depth):
             return
 
         directParentPrim = self.nodeGraph.GetPrim()
@@ -1482,10 +1492,10 @@ class GraphWidget(QtWidgets.QWidget):
         maxDepth = self.maxDepth + 1
         directParentPrim = self.nodeGraph.GetPrim()
 
-        columns = []
-        for i in range(0, maxDepth):
-            columns.append(QtWidgets.QGraphicsLinearLayout(QtCore.Qt.Vertical))
-            columns[i].addStretch()
+        columns = [QtWidgets.QGraphicsLinearLayout(QtCore.Qt.Vertical)
+                   for _ in range(maxDepth)]
+        for column in columns:
+            column.addStretch()
 
         def AddProxyWidgetToColumn(widget, columnIndex):
             proxy = QtWidgets.QGraphicsProxyWidget()
@@ -1495,32 +1505,17 @@ class GraphWidget(QtWidgets.QWidget):
             return proxy
 
         # Insert the node representing the parent node graph inputs
-        if self.parentNgInputMap:
+        for ngPrim, (depth, inputNames) in self.parentNgInputMap.items():
+            nodeGraph = UsdShade.NodeGraph(ngPrim)
+            ngInputs = [nodeGraph.GetInput(name) for name in inputNames]
+            w = MakeNgInputNode(nodeGraph, ngInputs)
 
-            parentNgs = self.parentNgInputMap.items()
-
-            for kv in parentNgs:
-                ngPrim = kv[0]
-                depthAndInputs = kv[1]
-
-                nodeGraph = UsdShade.NodeGraph(ngPrim)
-
-                ngInputs = []
-                for inputStr in depthAndInputs[1]:
-                    ngInputs.append(nodeGraph.GetInput(inputStr))
-
-                w = MakeNgInputNode(nodeGraph, ngInputs)
-
-                columnIndex = maxDepth - depthAndInputs[0] - 1
-
-                proxy = AddProxyWidgetToColumn(w, columnIndex)
-
-                self.parentNgWidgetMap[ngPrim] = proxy
+            columnIndex = maxDepth - depth - 1
+            self.parentNgWidgetMap[ngPrim] = AddProxyWidgetToColumn(
+                w, columnIndex)
 
         # Insert all previously traversed nodes
-        for prim in self.nodeMap:
-            (prim, depth) = self.nodeMap[prim]
-
+        for prim, depth in self.nodeMap.items():
             if prim == directParentPrim:
                 nodeGraph = UsdShade.NodeGraph(prim)
                 outputs = nodeGraph.GetOutputs()
@@ -1549,7 +1544,7 @@ class GraphWidget(QtWidgets.QWidget):
             return
 
         # We reuse the nodemap from the discovery phase to skip existing connections.
-        if not self.UpdateNodeMap(prim, depth):
+        if not self.UpdateNodeDepth(prim, depth):
             return
 
         for port in ports:
@@ -1573,7 +1568,8 @@ class GraphWidget(QtWidgets.QWidget):
             endNode = self.widgetMap[prim]
             inputPortName = port.GetBaseName()
 
-            line = MakeConnectionWidget(startNode, outputPortName, endNode, inputPortName)
+            line = SplineConnectionWidget(
+                startNode, outputPortName, endNode, inputPortName)
             self.scene.addItem(line)
 
             # We stop traversal when we encounter a parent node graph
@@ -1627,28 +1623,6 @@ class GraphWidget(QtWidgets.QWidget):
         self.graphView.setScene(self.scene)
         self.UpdateNodeFilterTargets()
 
-    def __init__(self, ngChangeCallback):
-        super().__init__()
-
-        self.selectedProxies = []
-        self.nodeFilterTargets = {}
-        self.widgetMap = {}
-        self.parentNgWidgetMap = {}
-        self.scene = None
-
-        graphView = GraphView()
-
-        self.ngChangeCallback = ngChangeCallback
-        self.graphView = graphView
-
-        layout = QtWidgets.QVBoxLayout()
-        layout.addWidget(graphView)
-        self.setLayout(layout)
-
-        app = QtWidgets.QApplication.instance()
-        if app is not None:
-            app.installEventFilter(self)
-
     def GetAllNodeProxies(self):
         return (list(self.widgetMap.values())
                 + list(self.parentNgWidgetMap.values()))
@@ -1664,27 +1638,23 @@ class GraphWidget(QtWidgets.QWidget):
                 self.nodeFilterTargets[child] = proxy
 
     def UpdateSelectionStyles(self):
-        selected = self.selectedProxies
         for proxy in self.GetAllNodeProxies():
             node = proxy.widget()
             if isinstance(node, GraphNode):
-                node.SetSelected(proxy in selected)
+                node.SetSelected(proxy in self.selectedProxies)
 
     def ClearSelection(self):
-        if not self.selectedProxies:
-            return
-
-        self.selectedProxies = []
-        self.UpdateSelectionStyles()
+        if self.selectedProxies:
+            self.selectedProxies = []
+            self.UpdateSelectionStyles()
 
     def SelectNode(self, proxy, modifiers):
-        if modifiers & QtCore.Qt.ShiftModifier:
-            if proxy in self.selectedProxies:
-                self.selectedProxies.remove(proxy)
-            else:
-                self.selectedProxies.append(proxy)
-        else:
+        if not (modifiers & QtCore.Qt.ShiftModifier):
             self.selectedProxies = [proxy]
+        elif proxy in self.selectedProxies:
+            self.selectedProxies.remove(proxy)
+        else:
+            self.selectedProxies.append(proxy)
 
         self.UpdateSelectionStyles()
 
@@ -1693,6 +1663,12 @@ class GraphWidget(QtWidgets.QWidget):
 
     def FrameAll(self):
         self.FrameNodes(self.GetAllNodeProxies())
+
+    def ZoomIn(self):
+        self.graphView.ZoomIn()
+
+    def ZoomOut(self):
+        self.graphView.ZoomOut()
 
     def FrameNodes(self, proxies):
         if self.scene is None:
@@ -1718,16 +1694,18 @@ class GraphWidget(QtWidgets.QWidget):
     def IsPanelKey(self, event):
         return self.IsFrameKey(event) or self.IsZoomKey(event)
 
-    def IsGraphEventTarget(self, obj):
+    def IsKeyTarget(self, obj):
         if obj is self or obj is self.graphView:
             return True
         if obj is self.graphView.viewport():
             return True
-        return obj in self.nodeFilterTargets
+        if obj in self.nodeFilterTargets:
+            return True
+
+        return self.IsGraphUnderMouse()
 
     def IsGraphUnderMouse(self):
-        app = QtWidgets.QApplication.instance()
-        if app is not None and app.activeModalWidget() is not None:
+        if QtWidgets.QApplication.activeModalWidget() is not None:
             return False
 
         widget = QtWidgets.QApplication.widgetAt(QtGui.QCursor.pos())
@@ -1737,9 +1715,6 @@ class GraphWidget(QtWidgets.QWidget):
         return (widget is self.graphView.viewport()
                 or widget in self.nodeFilterTargets)
 
-    def IsGraphKeyTarget(self, obj):
-        return self.IsGraphEventTarget(obj) or self.IsGraphUnderMouse()
-
     def HandleKeyPress(self, event):
         key = event.key()
 
@@ -1748,31 +1723,28 @@ class GraphWidget(QtWidgets.QWidget):
         elif key == QtCore.Qt.Key.Key_A:
             self.FrameAll()
         elif key in (QtCore.Qt.Key.Key_Plus, QtCore.Qt.Key.Key_Equal):
-            self.graphView.ZoomIn()
+            self.ZoomIn()
         elif key in (QtCore.Qt.Key.Key_Minus,
                      QtCore.Qt.Key.Key_Underscore):
-            self.graphView.ZoomOut()
+            self.ZoomOut()
 
         return True
-
-    def IsNodeItem(self, item):
-        return any(item is proxy for proxy in self.GetAllNodeProxies())
 
     def eventFilter(self, obj, event):
         eventType = event.type()
 
         if eventType == QtCore.QEvent.Type.ShortcutOverride:
-            if self.IsPanelKey(event) and self.IsGraphKeyTarget(obj):
+            if self.IsPanelKey(event) and self.IsKeyTarget(obj):
                 event.accept()
                 return True
         elif eventType == QtCore.QEvent.Type.KeyPress:
-            if self.IsPanelKey(event) and self.IsGraphKeyTarget(obj):
+            if self.IsPanelKey(event) and self.IsKeyTarget(obj):
                 return self.HandleKeyPress(event)
         elif eventType == QtCore.QEvent.Type.MouseButtonPress:
             if (event.button() == QtCore.Qt.LeftButton
                     and obj is self.graphView.viewport()):
                 item = self.graphView.itemAt(event.pos())
-                if self.IsNodeItem(item):
+                if item in self.GetAllNodeProxies():
                     self.SelectNode(item, event.modifiers())
                 else:
                     self.ClearSelection()
@@ -1808,7 +1780,7 @@ class GraphDockWidget(QtWidgets.QDockWidget):
         # The graph keys are handled contextually by GraphWidget; keeping
         # this scoped avoids clashing with usdview's global shortcuts.
         action.setShortcutContext(QtCore.Qt.WidgetShortcut)
-        action.triggered.connect(lambda *args: callback())
+        action.triggered.connect(callback)
         return action
 
     def UpdateMenuBar(self):
@@ -1819,7 +1791,7 @@ class GraphDockWidget(QtWidgets.QDockWidget):
         viewMenu = menuBar.addMenu("View")
         if self.historyStack:
             a = viewMenu.addAction("Back to Parent")
-            a.triggered.connect(lambda *args: self.BackToParentNodeGraph())
+            a.triggered.connect(self.BackToParentNodeGraph)
             viewMenu.addSeparator()
 
         self.AddViewAction(viewMenu, "Frame Selected", "F",
@@ -1827,9 +1799,9 @@ class GraphDockWidget(QtWidgets.QDockWidget):
         self.AddViewAction(viewMenu, "Frame All", "A",
                            self.graphWidget.FrameAll)
         self.AddViewAction(viewMenu, "Zoom In", "+",
-                           self.graphWidget.graphView.ZoomIn)
+                           self.graphWidget.ZoomIn)
         self.AddViewAction(viewMenu, "Zoom Out", "-",
-                           self.graphWidget.graphView.ZoomOut)
+                           self.graphWidget.ZoomOut)
         viewMenu.addSeparator()
 
         outputMenu = viewMenu.addMenu("Filter Output")
@@ -1857,10 +1829,10 @@ class GraphDockWidget(QtWidgets.QDockWidget):
 
             if outputName == 'mtlx:surface':
                 a = toolsMenu.addAction("Bake to Texture...")
-                a.triggered.connect(lambda *args: self.ShowBakeMtlxDialog())
+                a.triggered.connect(self.ShowBakeMtlxDialog)
 
         exportAction = toolsMenu.addAction("Export as Image...")
-        exportAction.triggered.connect(lambda *args: self.ShowExportAsImageDialog())
+        exportAction.triggered.connect(self.ShowExportAsImageDialog)
 
         self.contentLayout.setMenuBar(menuBar)
 
@@ -1876,11 +1848,9 @@ class GraphDockWidget(QtWidgets.QDockWidget):
 
     def UpdateContentForOutput(self):
         primPath = str(self.nodeGraph.GetPrim().GetPath())
-        if self.selectedOutput is None:
-            outputStr = ''
-        else:
-            outputName = self.selectedOutput.GetBaseName()
-            outputStr = f' ({outputName})'
+        outputStr = ''
+        if self.selectedOutput is not None:
+            outputStr = f' ({self.selectedOutput.GetBaseName()})'
 
         self.setWindowTitle(
             f"{self.DEFAULT_TITLE}: {primPath}{outputStr}")
@@ -1902,8 +1872,7 @@ class GraphDockWidget(QtWidgets.QDockWidget):
     def SetNodeGraph(self, nodeGraph):
         # Store old NGs on a stack so that we can navigate back using the menu
         if self.nodeGraph is not None and nodeGraph != self.nodeGraph:
-            state = (self.nodeGraph, self.selectedOutput)
-            self.historyStack.append(state)
+            self.historyStack.append((self.nodeGraph, self.selectedOutput))
 
         self.nodeGraph = nodeGraph
         self.selectedOutput = self.GetDefaultOutput()
@@ -2023,8 +1992,6 @@ class UsdShadeViewContainer(PluginContainer):
     def registerPlugins(self, plugRegistry, usdviewApi):
         self.usdviewApi = usdviewApi
         self.dockWidget = None
-        self.dockAction = None
-        self.dockState = None
         self.sdrNodesMenu = plugRegistry.registerCommandPlugin(
             self.SDR_NODES_COMMAND_NS,
             "List of Sdr nodes",
@@ -2066,15 +2033,14 @@ class UsdShadeViewContainer(PluginContainer):
         mainWindow.addDockWidget(
             QtCore.Qt.RightDockWidgetArea, self.dockWidget)
 
-        self.dockAction = windowMenu.addItem(self.toggleDockCommand)
-        self.dockAction.setCheckable(True)
-        self.dockAction.setChecked(self.dockWidget.isVisible())
-        self.dockWidget.visibilityChanged.connect(
-            self.dockAction.setChecked)
+        dockAction = windowMenu.addItem(self.toggleDockCommand)
+        dockAction.setCheckable(True)
+        dockAction.setChecked(self.dockWidget.isVisible())
+        self.dockWidget.visibilityChanged.connect(dockAction.setChecked)
 
-        self.dockState = UsdShadeViewDockState(
+        dockState = UsdShadeViewDockState(
             self.GetSettingsSource(), mainWindow, self.dockWidget)
-        self.dockState.Restore()
+        dockState.Restore()
 
     def GetSettingsSource(self):
         getSettings = getattr(self.usdviewApi, "GetSettings", None)
