@@ -32,7 +32,7 @@ def GetShaderNodeType(shaderOrNG):
 
     if Usd.GetVersion() >= (0, 24, 5):
         for s in shaderOrNG.GetSourceTypes():
-            if s == 'mdl':
+            if s == "mdl":
                 return NodeType.MDL
 
     ndId = shaderOrNG.GetShaderId()
@@ -42,52 +42,60 @@ def GetShaderNodeType(shaderOrNG):
     sdrReg = Sdr.Registry()
     nd = sdrReg.GetShaderNodeByIdentifier(ndId)
     if not nd:
-        return NodeType.UNKNOWN # Can be a mtlx ND mismatch
+        return NodeType.UNKNOWN  # Can be a mtlx ND mismatch
 
     context = nd.GetContext()
     if not context:
         return NodeType.UNKNOWN
 
-    if context == 'usda':
+    if context == "usda":
         return NodeType.USDA
-    elif nd.GetSourceType() == 'mtlx':
+    elif nd.GetSourceType() == "mtlx":
         return NodeType.MTLX
-    elif nd.GetSourceType() == 'osl':
+    elif nd.GetSourceType() == "osl":
         return NodeType.OSL
 
     return NodeType.UNKNOWN
 
+
 def IsDefaultOutputPortName(name):
-    return name == 'out' or name == 'result'
+    return name == "out" or name == "result"
+
 
 def IsOpenFileWithSystemSupported():
-    return platform.system() in ['Windows', 'Darwin'] or shutil.which("xdg-open")
+    return platform.system() in ["Windows", "Darwin"] or shutil.which(
+        "xdg-open"
+    )
+
 
 def OpenFileWithSystem(filePath):
-    if platform.system() == 'Darwin':
-        os.system(f'open {filePath}')
-    elif platform.system() == 'Windows':
-        os.system(f'start {filePath}')
+    if platform.system() == "Darwin":
+        os.system(f"open {filePath}")
+    elif platform.system() == "Windows":
+        os.system(f"start {filePath}")
     else:
-        subprocess.call(('xdg-open', filePath))
+        subprocess.call(("xdg-open", filePath))
+
 
 def IsOpenFileInFolderSupported():
-    return platform.system() in ['Windows', 'Darwin']
+    return platform.system() in ["Windows", "Darwin"]
+
 
 def OpenFileInFolderWithSystem(filePath):
-    if platform.system() == 'Darwin':
-        os.system(f'open -R {filePath}')
-    elif platform.system() == 'Windows':
-        os.system(f'explorer.exe /select,{filePath}')
+    if platform.system() == "Darwin":
+        os.system(f"open -R {filePath}")
+    elif platform.system() == "Windows":
+        os.system(f"explorer.exe /select,{filePath}")
 
-def FormatFloatShort(value, numDigits = 4):
+
+def FormatFloatShort(value, numDigits=4):
     if abs(value) < 1e-5:
         return "0"
     if abs(value) < 1e-3:
         return f"{value:.2e}"
     else:
         s = f"{value:.{numDigits}f}"
-        s = s.rstrip('0')
-        if s.endswith('.'):
-            s += '0'
+        s = s.rstrip("0")
+        if s.endswith("."):
+            s += "0"
         return s

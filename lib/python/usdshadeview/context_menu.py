@@ -21,7 +21,6 @@ from pxr.Usdviewq.primContextMenuItems import PrimContextMenuItem
 
 
 class ShowUsdShadeGraphContextMenuItem(PrimContextMenuItem):
-
     def __init__(self, appController, item, usdviewApi, viewContainer):
         super().__init__(appController, item)
         self.usdviewApi = usdviewApi
@@ -39,7 +38,9 @@ class ShowUsdShadeGraphContextMenuItem(PrimContextMenuItem):
 
     def RunCommand(self):
         prim = self.GetFocusedPrim()
-        nodeGraph = UsdShade.NodeGraph(prim) # UsdShade.Material inherits from NodeGraph
+        nodeGraph = UsdShade.NodeGraph(
+            prim
+        )  # UsdShade.Material inherits from NodeGraph
         outputs = nodeGraph.GetOutputs()
 
         if not outputs:

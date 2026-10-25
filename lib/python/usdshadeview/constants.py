@@ -24,16 +24,17 @@ MAX_NODE_GRAPH_DEPTH = 80
 
 class UIColors(str, Enum):
     GOLD = "#c39a46"
-    CHARCOAL = "#373737" # usdviewstyle.qss QTable background
+    CHARCOAL = "#373737"  # usdviewstyle.qss QTable background
     MDL_GREEN = "#77AB47"
-    DARK_GREY = "#2a2a2a" # match usdviewstyle.qss
+    DARK_GREY = "#2a2a2a"  # match usdviewstyle.qss
     LIGHT_RED = "#e68483"
     LIGHT_BLUE = "#bec8f4"
     LIGHT_PURPLE = "#c8a7f7"
     LIGHT_GREY = "#aaaaaa"
 
+
 class NodeType(Enum):
-    MDL = 1 # TODO: maybe we can promote MDL to some general 'source asset' type node?
+    MDL = 1  # TODO: maybe we can promote MDL to some general 'source asset' type node?
     MTLX = 2
     OSL = 3
     USDA = 4
@@ -41,6 +42,7 @@ class NodeType(Enum):
     PARENT_INPUTS = 6
     PARENT_OUTPUTS = 7
     UNKNOWN = 8
+
 
 NodeColors = {
     NodeType.USDA: UIColors.GOLD,
@@ -50,7 +52,7 @@ NodeColors = {
     NodeType.NODE_GRAPH: UIColors.LIGHT_PURPLE,
     NodeType.PARENT_INPUTS: UIColors.LIGHT_PURPLE,
     NodeType.PARENT_OUTPUTS: UIColors.LIGHT_PURPLE,
-    NodeType.UNKNOWN: UIColors.LIGHT_GREY
+    NodeType.UNKNOWN: UIColors.LIGHT_GREY,
 }
 
 BORDER_WIDGET_STYLE = f"""
@@ -100,6 +102,7 @@ ARRAY_BUTTON_STYLE = """
         background-color: #11000000;
     }
 """
+
 
 class PortType(Enum):
     INPUT = 1

@@ -25,14 +25,14 @@ from .constants import (
     SELECTED_NODE_STYLE,
     NodeColors,
     NodeType,
-    PortType)
+    PortType,
+)
 from .dialogs import OpenNodeDefDialog
 from .utils import GetShaderNodeType, IsDefaultOutputPortName
 from .value_widgets import MakePortWidget, MakePropertyWidget
 
 
 class GraphNode(QtWidgets.QFrame):
-
     def __init__(self):
         super().__init__()
 
@@ -52,12 +52,17 @@ class GraphNode(QtWidgets.QFrame):
 
         self.selected = selected
         self.setStyleSheet(
-            SELECTED_NODE_STYLE if selected else BORDER_WIDGET_STYLE)
+            SELECTED_NODE_STYLE if selected else BORDER_WIDGET_STYLE
+        )
 
-    def AddHeader(self, title, subtitle, color, auxButtonText = '', auxButtonTooltip = ''):
+    def AddHeader(
+        self, title, subtitle, color, auxButtonText="", auxButtonTooltip=""
+    ):
         nameLabel = QtWidgets.QLabel(title)
         typeLabel = QtWidgets.QLabel(subtitle)
-        typeLabel.setStyleSheet("QLabel { font-style: italic; font-weight: 100; }")
+        typeLabel.setStyleSheet(
+            "QLabel { font-style: italic; font-weight: 100; }"
+        )
 
         nameTypeLayout = QtWidgets.QVBoxLayout()
         nameTypeLayout.setSpacing(2)
@@ -78,13 +83,14 @@ class GraphNode(QtWidgets.QFrame):
 
         headerFrame = QtWidgets.QFrame()
         headerFrame.setLayout(headerLayout)
-        headerFrame.setStyleSheet(f"QFrame {{ background-color: {color.value}; color: #000; }}")
+        headerFrame.setStyleSheet(
+            f"QFrame {{ background-color: {color.value}; color: #000; }}"
+        )
 
         self.layout().addWidget(headerFrame)
 
 
 class ShaderNode(GraphNode):
-
     def AddBody(self, inputs, outputs, props):
         portLayout = QtWidgets.QVBoxLayout()
         portLayout.setContentsMargins(8, 10, 8, 8)
@@ -100,18 +106,24 @@ class ShaderNode(GraphNode):
             hasUpstream = i.HasConnectedSource()
             name = i.GetBaseName()
 
-            if not hasUpstream and (type(i) != UsdShade.Output and i.Get() is None):
+            if not hasUpstream and (
+                type(i) != UsdShade.Output and i.Get() is None
+            ):
                 # Input is defined on the prim but not assigned any value
                 continue
 
             nodeTypeBlacklist = [
                 NodeType.UNKNOWN,
                 NodeType.NODE_GRAPH,
-                NodeType.MDL
+                NodeType.MDL,
             ]
 
             # skip input values if they match the default values
-            if self.shaderOrNG and not hasUpstream and self.nodeType not in nodeTypeBlacklist:
+            if (
+                self.shaderOrNG
+                and not hasUpstream
+                and self.nodeType not in nodeTypeBlacklist
+            ):
                 reg = Sdr.Registry()
                 ndId = self.shaderOrNG.GetShaderId()
                 if ndId:
@@ -123,7 +135,10 @@ class ShaderNode(GraphNode):
                             ndInput = nd.GetInput(name)
 
                         # TODO: compare floats with epsilon
-                        if ndInput is not None and i.Get() == ndInput.GetDefaultValue():
+                        if (
+                            ndInput is not None
+                            and i.Get() == ndInput.GetDefaultValue()
+                        ):
                             continue
 
             rowWidget, nameWidget = MakePortWidget(i, PortType.INPUT)
@@ -151,7 +166,9 @@ class ShaderNode(GraphNode):
             # We only show outputs if their name is non-standard, indicating that there are multiple
             elif not IsDefaultOutputPortName(name):
                 nameWidget = QtWidgets.QLabel(name)
-                nameWidget.setAlignment(QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter)
+                nameWidget.setAlignment(
+                    QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter
+                )
                 portLayout.addWidget(nameWidget)
                 self.outputPortWidgets[name] = nameWidget
 
@@ -190,7 +207,16 @@ class ShaderNode(GraphNode):
 
         return QtCore.QPointF(x, y)
 
-    def __init__(self, nodeName, nodeType, inputs, outputs, ngChangeCallback = None, shaderOrNG = None, props = None):
+    def __init__(
+        self,
+        nodeName,
+        nodeType,
+        inputs,
+        outputs,
+        ngChangeCallback=None,
+        shaderOrNG=None,
+        props=None,
+    ):
         super().__init__()
 
         self.ngChangeCallback = ngChangeCallback
@@ -204,7 +230,11 @@ class ShaderNode(GraphNode):
 
         if self.nodeType == NodeType.MDL:
             typeName = "<MDL source file>"
-        elif self.nodeType in [ NodeType.NODE_GRAPH, NodeType.PARENT_INPUTS, NodeType.PARENT_OUTPUTS ]:
+        elif self.nodeType in [
+            NodeType.NODE_GRAPH,
+            NodeType.PARENT_INPUTS,
+            NodeType.PARENT_OUTPUTS,
+        ]:
             typeName = "<node graph>"
         elif self.nodeType == NodeType.UNKNOWN:
             typeName = "<missing>"
@@ -219,7 +249,12 @@ class ShaderNode(GraphNode):
         if self.nodeType == NodeType.NODE_GRAPH:
             auxButtonText = "E"
             auxButtonTooltip = "Enter Node Graph"
-        elif self.nodeType not in [ NodeType.UNKNOWN, NodeType.MDL, NodeType.PARENT_INPUTS, NodeType.PARENT_OUTPUTS ]:
+        elif self.nodeType not in [
+            NodeType.UNKNOWN,
+            NodeType.MDL,
+            NodeType.PARENT_INPUTS,
+            NodeType.PARENT_OUTPUTS,
+        ]:
             auxButtonText = "?"
             auxButtonTooltip = "Show Node Definition"
         else:
@@ -228,7 +263,9 @@ class ShaderNode(GraphNode):
 
         headerColor = NodeColors[self.nodeType]
 
-        self.AddHeader(nodeName, typeName, headerColor, auxButtonText, auxButtonTooltip)
+        self.AddHeader(
+            nodeName, typeName, headerColor, auxButtonText, auxButtonTooltip
+        )
         self.AddBody(inputs, outputs, props)
 
 
@@ -248,7 +285,15 @@ def MakeSdrShaderNode(prim, ngChangeCallback):
     inputs = shaderOrNG.GetInputs()
     outputs = shaderOrNG.GetOutputs()
 
-    return ShaderNode(nodeName, nodeType, inputs, outputs, ngChangeCallback, shaderOrNG, props)
+    return ShaderNode(
+        nodeName,
+        nodeType,
+        inputs,
+        outputs,
+        ngChangeCallback,
+        shaderOrNG,
+        props,
+    )
 
 
 def MakeNgInputNode(nodeGraph, inputs):

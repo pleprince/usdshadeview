@@ -22,16 +22,19 @@ from pxr.Usdviewq.qt import GetPySideModule
 
 PySideModule = GetPySideModule()
 
-if PySideModule == 'PySide2':
+if PySideModule == "PySide2":
     # There is an issue on Windows where under certain circumstances the
     # buttons in the QGraphicsView cannot be clicked anymore. There's also
     # some error log spam. This might not affect all OSes.
     enableHwAcceleration = False
 else:
     # Disable this if you run into rendering issues
-    enableHwAcceleration = (
-        os.getenv("USDSHADEVIEW_HW_ACCEL", "1")
-        in ("1", "true", "yes", "on"))
+    enableHwAcceleration = os.getenv("USDSHADEVIEW_HW_ACCEL", "1") in (
+        "1",
+        "true",
+        "yes",
+        "on",
+    )
 
 mtlxSupported = True
 try:
@@ -46,4 +49,4 @@ try:
 except ModuleNotFoundError:
     oiio = None
 
-oiioSupported = oiio is not None and hasattr(oiio, 'ImageInput')
+oiioSupported = oiio is not None and hasattr(oiio, "ImageInput")

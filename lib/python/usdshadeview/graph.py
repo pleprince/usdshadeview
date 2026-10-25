@@ -19,12 +19,7 @@
 import sys
 
 from pxr import UsdShade
-from pxr.Usdviewq.qt import (
-    QGLFormat,
-    QGLWidget,
-    QtCore,
-    QtGui,
-    QtWidgets)
+from pxr.Usdviewq.qt import QGLFormat, QGLWidget, QtCore, QtGui, QtWidgets
 
 from .compat import PySideModule, enableHwAcceleration
 from .connections import SplineConnectionWidget
@@ -33,7 +28,8 @@ from .nodes import (
     GraphNode,
     MakeNgInputNode,
     MakeNgOutputNode,
-    MakeSdrShaderNode)
+    MakeSdrShaderNode,
+)
 
 
 class GraphView(QtWidgets.QGraphicsView):
@@ -45,20 +41,22 @@ class GraphView(QtWidgets.QGraphicsView):
         super().__init__()
 
         self.setDragMode(QtWidgets.QGraphicsView.ScrollHandDrag)
-        self.setRenderHints(QtGui.QPainter.Antialiasing |
-                            QtGui.QPainter.TextAntialiasing |
-                            QtGui.QPainter.SmoothPixmapTransform)
+        self.setRenderHints(
+            QtGui.QPainter.Antialiasing
+            | QtGui.QPainter.TextAntialiasing
+            | QtGui.QPainter.SmoothPixmapTransform
+        )
         # Fix background not updating when window is hovering on top
         self.setViewportUpdateMode(QtWidgets.QGraphicsView.FullViewportUpdate)
 
         # HW acceleration greatly speeds up spline rendering and has better AA
         if enableHwAcceleration:
             glFormat = QGLFormat()
-            glFormat.setSamples(8) # MSAA
-            if PySideModule != 'PySide6':
+            glFormat.setSamples(8)  # MSAA
+            if PySideModule != "PySide6":
                 glFormat.setSampleBuffers(True)
 
-            if PySideModule == 'PySide6':
+            if PySideModule == "PySide6":
                 glWidget = QGLWidget()
                 glWidget.setFormat(glFormat)
             else:
@@ -108,9 +106,9 @@ class GraphView(QtWidgets.QGraphicsView):
         angleDelta = event.angleDelta().y()
 
         if angleDelta != 0:
-            factor = 1.0015 ** angleDelta
+            factor = 1.0015**angleDelta
         elif pixelDelta != 0:
-            factor = 1.005 ** pixelDelta
+            factor = 1.005**pixelDelta
         else:
             event.ignore()
             return
@@ -163,7 +161,6 @@ class GraphView(QtWidgets.QGraphicsView):
 
 
 class GraphWidget(QtWidgets.QWidget):
-
     def __init__(self, ngChangeCallback):
         super().__init__()
 
@@ -186,13 +183,15 @@ class GraphWidget(QtWidgets.QWidget):
             app.installEventFilter(self)
 
     def RenderSceneToImage(self):
-        scaleFactor = 4.0 # Higher values = larger resolution = less aliasing
+        scaleFactor = 4.0  # Higher values = larger resolution = less aliasing
 
         self.scene.clearSelection()
         self.scene.setSceneRect(self.scene.itemsBoundingRect())
 
         imageSize = self.scene.sceneRect().size().toSize()
-        image = QtGui.QImage(imageSize * scaleFactor, QtGui.QImage.Format_ARGB32)
+        image = QtGui.QImage(
+            imageSize * scaleFactor, QtGui.QImage.Format_ARGB32
+        )
         image.fill(QtCore.Qt.transparent)
 
         painter = QtGui.QPainter(image)
@@ -226,7 +225,7 @@ class GraphWidget(QtWidgets.QWidget):
             nodeGraph = UsdShade.NodeGraph(prim)
             return nodeGraph.GetInputs()
 
-        return [] # (should not happen)
+        return []  # (should not happen)
 
     # Traverses the node graph hierarchy until we're outside of the UsdShade network
     # and checks if any of the parent node graph prims matches our prim.
@@ -271,11 +270,10 @@ class GraphWidget(QtWidgets.QWidget):
 
             # Check if this output is actually an input from a parent NG
             if self.IsParentNodeGraph(upstreamPrim, directParentPrim):
-
                 if upstreamPrim in self.parentNgInputMap:
                     t = self.parentNgInputMap[upstreamPrim]
                 else:
-                    t = (0, set()) # depth, input name
+                    t = (0, set())  # depth, input name
 
                 newDepth = max(depth + 1, t[0])
                 newMap = t[1]
@@ -297,15 +295,17 @@ class GraphWidget(QtWidgets.QWidget):
         maxDepth = self.maxDepth + 1
         directParentPrim = self.nodeGraph.GetPrim()
 
-        columns = [QtWidgets.QGraphicsLinearLayout(QtCore.Qt.Vertical)
-                   for _ in range(maxDepth)]
+        columns = [
+            QtWidgets.QGraphicsLinearLayout(QtCore.Qt.Vertical)
+            for _ in range(maxDepth)
+        ]
         for column in columns:
             column.addStretch()
 
         def AddProxyWidgetToColumn(widget, columnIndex):
             proxy = QtWidgets.QGraphicsProxyWidget()
             proxy.setWidget(widget)
-            proxy.setZValue(1) # Render nodes on top of lines
+            proxy.setZValue(1)  # Render nodes on top of lines
             columns[columnIndex].addItem(proxy)
             return proxy
 
@@ -317,7 +317,8 @@ class GraphWidget(QtWidgets.QWidget):
 
             columnIndex = maxDepth - depth - 1
             self.parentNgWidgetMap[ngPrim] = AddProxyWidgetToColumn(
-                w, columnIndex)
+                w, columnIndex
+            )
 
         # Insert all previously traversed nodes
         for prim, depth in self.nodeMap.items():
@@ -336,7 +337,7 @@ class GraphWidget(QtWidgets.QWidget):
             column = columns[i]
 
             if column.count() == 0:
-                continue # Should only happen in the case of circular graphs
+                continue  # Should only happen in the case of circular graphs
 
             column.addStretch()
             self.graphLayout.addItem(column)
@@ -374,7 +375,8 @@ class GraphWidget(QtWidgets.QWidget):
             inputPortName = port.GetBaseName()
 
             line = SplineConnectionWidget(
-                startNode, outputPortName, endNode, inputPortName)
+                startNode, outputPortName, endNode, inputPortName
+            )
             self.scene.addItem(line)
 
             # We stop traversal when we encounter a parent node graph
@@ -393,7 +395,11 @@ class GraphWidget(QtWidgets.QWidget):
         self.scene = QtWidgets.QGraphicsScene(self)
 
         rootPrim = nodeGraph.GetPrim()
-        rootInputs = nodeGraph.GetOutputs() if selectedOutput is None else [ selectedOutput ]
+        rootInputs = (
+            nodeGraph.GetOutputs()
+            if selectedOutput is None
+            else [selectedOutput]
+        )
 
         #
         # Our layouting algorithm is simple and has three steps:
@@ -405,17 +411,19 @@ class GraphWidget(QtWidgets.QWidget):
         #
         # 3) Traverse the network again to create widgets for the node connections.
         #
-        self.graphLayout = QtWidgets.QGraphicsLinearLayout(QtCore.Qt.Horizontal)
+        self.graphLayout = QtWidgets.QGraphicsLinearLayout(
+            QtCore.Qt.Horizontal
+        )
         self.graphLayout.setContentsMargins(22, 22, 22, 22)
         self.graphLayout.setSpacing(64)
 
         self.maxDepth = 0
-        self.nodeMap = {} # [prim, depth]
-        self.parentNgInputMap = {} # used parent node graph inputs
-        self.parentNgWidgetMap = {} # [prim, node widget]
+        self.nodeMap = {}  # [prim, depth]
+        self.parentNgInputMap = {}  # used parent node graph inputs
+        self.parentNgWidgetMap = {}  # [prim, node widget]
         self.BuildNodeMap(rootPrim, rootInputs, 0)
 
-        self.widgetMap = {} # [prim, node widget]
+        self.widgetMap = {}  # [prim, node widget]
         self.AddNodesToLayout()
 
         self.nodeMap = {}
@@ -429,8 +437,9 @@ class GraphWidget(QtWidgets.QWidget):
         self.UpdateNodeFilterTargets()
 
     def GetAllNodeProxies(self):
-        return (list(self.widgetMap.values())
-                + list(self.parentNgWidgetMap.values()))
+        return list(self.widgetMap.values()) + list(
+            self.parentNgWidgetMap.values()
+        )
 
     def UpdateNodeFilterTargets(self):
         for proxy in self.GetAllNodeProxies():
@@ -484,17 +493,26 @@ class GraphWidget(QtWidgets.QWidget):
             self.graphView.FrameItems(proxies)
 
     def IsFrameKey(self, event):
-        return (event.key() in (QtCore.Qt.Key.Key_F, QtCore.Qt.Key.Key_A)
-                and event.modifiers() in (QtCore.Qt.NoModifier,
-                                          QtCore.Qt.KeypadModifier))
+        return event.key() in (
+            QtCore.Qt.Key.Key_F,
+            QtCore.Qt.Key.Key_A,
+        ) and event.modifiers() in (
+            QtCore.Qt.NoModifier,
+            QtCore.Qt.KeypadModifier,
+        )
 
     def IsZoomKey(self, event):
-        zoomKeys = (QtCore.Qt.Key.Key_Plus, QtCore.Qt.Key.Key_Equal,
-                    QtCore.Qt.Key.Key_Minus, QtCore.Qt.Key.Key_Underscore)
-        return (event.key() in zoomKeys
-                and event.modifiers() in (QtCore.Qt.NoModifier,
-                                          QtCore.Qt.ShiftModifier,
-                                          QtCore.Qt.KeypadModifier))
+        zoomKeys = (
+            QtCore.Qt.Key.Key_Plus,
+            QtCore.Qt.Key.Key_Equal,
+            QtCore.Qt.Key.Key_Minus,
+            QtCore.Qt.Key.Key_Underscore,
+        )
+        return event.key() in zoomKeys and event.modifiers() in (
+            QtCore.Qt.NoModifier,
+            QtCore.Qt.ShiftModifier,
+            QtCore.Qt.KeypadModifier,
+        )
 
     def IsPanelKey(self, event):
         return self.IsFrameKey(event) or self.IsZoomKey(event)
@@ -517,8 +535,10 @@ class GraphWidget(QtWidgets.QWidget):
         if widget is None:
             return False
 
-        return (widget is self.graphView.viewport()
-                or widget in self.nodeFilterTargets)
+        return (
+            widget is self.graphView.viewport()
+            or widget in self.nodeFilterTargets
+        )
 
     def HandleKeyPress(self, event):
         key = event.key()
@@ -529,8 +549,7 @@ class GraphWidget(QtWidgets.QWidget):
             self.FrameAll()
         elif key in (QtCore.Qt.Key.Key_Plus, QtCore.Qt.Key.Key_Equal):
             self.ZoomIn()
-        elif key in (QtCore.Qt.Key.Key_Minus,
-                     QtCore.Qt.Key.Key_Underscore):
+        elif key in (QtCore.Qt.Key.Key_Minus, QtCore.Qt.Key.Key_Underscore):
             self.ZoomOut()
 
         return True
@@ -546,8 +565,10 @@ class GraphWidget(QtWidgets.QWidget):
             if self.IsPanelKey(event) and self.IsKeyTarget(obj):
                 return self.HandleKeyPress(event)
         elif eventType == QtCore.QEvent.Type.MouseButtonPress:
-            if (event.button() == QtCore.Qt.LeftButton
-                    and obj is self.graphView.viewport()):
+            if (
+                event.button() == QtCore.Qt.LeftButton
+                and obj is self.graphView.viewport()
+            ):
                 item = self.graphView.itemAt(event.pos())
                 if item in self.GetAllNodeProxies():
                     self.SelectNode(item, event.modifiers())

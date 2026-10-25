@@ -30,7 +30,8 @@ from .compat import (
     enableHwAcceleration,
     mtlxSupported,
     oiio,
-    oiioSupported)
+    oiioSupported,
+)
 from .connections import ConnectionWidget, SplineConnectionWidget
 from .constants import (
     ARRAY_BUTTON_STYLE,
@@ -41,7 +42,8 @@ from .constants import (
     NodeColors,
     NodeType,
     PortType,
-    UIColors)
+    UIColors,
+)
 from .context_menu import ShowUsdShadeGraphContextMenuItem
 from .dialogs import (
     BakeMtlxDialog,
@@ -52,7 +54,8 @@ from .dialogs import (
     ShowValueArrayDialog,
     ValueArrayDialog,
     metadataDialogs,
-    nodeDefDialogs)
+    nodeDefDialogs,
+)
 from .dock import GraphDockWidget, UsdShadeViewDockState
 from .graph import GraphView, GraphWidget
 from .nodes import (
@@ -60,7 +63,8 @@ from .nodes import (
     MakeNgInputNode,
     MakeNgOutputNode,
     MakeSdrShaderNode,
-    ShaderNode)
+    ShaderNode,
+)
 from .utils import (
     FormatFloatShort,
     GetShaderNodeType,
@@ -68,7 +72,8 @@ from .utils import (
     IsOpenFileInFolderSupported,
     IsOpenFileWithSystemSupported,
     OpenFileInFolderWithSystem,
-    OpenFileWithSystem)
+    OpenFileWithSystem,
+)
 from .value_widgets import (
     AlphaWidget,
     MakeArrayValueWidget,
@@ -83,7 +88,8 @@ from .value_widgets import (
     MakeValueWidget,
     MakeVectorValueWidget,
     PixmapToBase64,
-    ValueProxyWidget)
+    ValueProxyWidget,
+)
 
 
 class UsdShadeViewContainer(PluginContainer):
@@ -94,14 +100,14 @@ class UsdShadeViewContainer(PluginContainer):
         self.usdviewApi = usdviewApi
         self.dockWidget = None
         self.sdrNodesMenu = plugRegistry.registerCommandPlugin(
-            self.SDR_NODES_COMMAND_NS,
-            "List of Sdr nodes",
-            lambda *args: None)
+            self.SDR_NODES_COMMAND_NS, "List of Sdr nodes", lambda *args: None
+        )
         self.toggleDockCommand = plugRegistry.registerCommandPlugin(
             self.TOGGLE_DOCK_COMMAND_NS,
             "UsdShade Node Graph",
             lambda *args: self.ToggleDock(),
-            "Show or hide the UsdShade node graph panel.")
+            "Show or hide the UsdShade node graph panel.",
+        )
 
     def configureView(self, plugRegistry, plugUIBuilder):
         windowMenu = plugUIBuilder.findOrCreateMenu("Window")
@@ -121,7 +127,8 @@ class UsdShadeViewContainer(PluginContainer):
                 item = plugRegistry.registerCommandPlugin(
                     f"{self.SDR_NODES_COMMAND_NS}.{ndId}",
                     ndId,
-                    lambda *args, n=ndId: OpenNodeDefDialog(n))
+                    lambda *args, n=ndId: OpenNodeDefDialog(n),
+                )
                 sdrNodeMenu.addItem(item)
 
         self.CreateDockWidget(windowMenu)
@@ -132,7 +139,8 @@ class UsdShadeViewContainer(PluginContainer):
 
         self.dockWidget = GraphDockWidget(mainWindow)
         mainWindow.addDockWidget(
-            QtCore.Qt.RightDockWidgetArea, self.dockWidget)
+            QtCore.Qt.RightDockWidgetArea, self.dockWidget
+        )
 
         dockAction = windowMenu.addItem(self.toggleDockCommand)
         dockAction.setCheckable(True)
@@ -140,7 +148,8 @@ class UsdShadeViewContainer(PluginContainer):
         self.dockWidget.visibilityChanged.connect(dockAction.setChecked)
 
         dockState = UsdShadeViewDockState(
-            self.GetSettingsSource(), mainWindow, self.dockWidget)
+            self.GetSettingsSource(), mainWindow, self.dockWidget
+        )
         dockState.Restore()
 
     def GetSettingsSource(self):
@@ -174,7 +183,8 @@ class UsdShadeViewContainer(PluginContainer):
                 return
 
             menuItem = ShowUsdShadeGraphContextMenuItem(
-                appController, item, usdviewApi, viewContainer)
+                appController, item, usdviewApi, viewContainer
+            )
 
             action = self.addAction(menuItem.GetText())
             action.setEnabled(menuItem.IsEnabled())
@@ -189,11 +199,13 @@ Tf.Type.Define(UsdShadeViewContainer)
 # Ignore warning spam in certain configurations
 baseHandler = QtCore.qInstallMessageHandler(None)
 
+
 def customMessageHandler(mode, context, message):
     if "unsupported paint engine type" in message:
         return
     if baseHandler is not None:
         baseHandler(mode, context, message)
 
-if enableHwAcceleration and platform.system() == 'Darwin':
+
+if enableHwAcceleration and platform.system() == "Darwin":
     QtCore.qInstallMessageHandler(customMessageHandler)

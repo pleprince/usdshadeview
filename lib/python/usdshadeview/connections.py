@@ -22,7 +22,6 @@ from .constants import PortType
 
 
 class ConnectionWidget:
-
     def __init__(self, startNode, outputName, endNode, inputName):
         super().__init__()
         self.startNode = startNode
@@ -37,8 +36,12 @@ class ConnectionWidget:
         self.UpdateGeometry()
 
     def UpdateGeometry(self):
-        outputPos = self.startNode.widget().GetPortPosition(self.outputName, PortType.OUTPUT)
-        inputPos = self.endNode.widget().GetPortPosition(self.inputName, PortType.INPUT)
+        outputPos = self.startNode.widget().GetPortPosition(
+            self.outputName, PortType.OUTPUT
+        )
+        inputPos = self.endNode.widget().GetPortPosition(
+            self.inputName, PortType.INPUT
+        )
 
         startPos = self.startNode.mapToScene(outputPos)
         endPos = self.endNode.mapToScene(inputPos)
@@ -48,7 +51,6 @@ class ConnectionWidget:
 
 # Bezier spline
 class SplineConnectionWidget(ConnectionWidget, QtWidgets.QGraphicsPathItem):
-
     def SetStartEndPoints(self, p1, p2):
         path = QtGui.QPainterPath()
 

@@ -44,7 +44,7 @@ class GraphDockWidget(QtWidgets.QDockWidget):
             self,
             "Save File",
             "graph.png",  # default dir = CWD
-            "Images (*.png *.webp);;All Files (*)"
+            "Images (*.png *.webp);;All Files (*)",
         )
 
         if filePath:
@@ -71,22 +71,24 @@ class GraphDockWidget(QtWidgets.QDockWidget):
             a.triggered.connect(self.BackToParentNodeGraph)
             viewMenu.addSeparator()
 
-        self.AddViewAction(viewMenu, "Frame Selected", "F",
-                           self.graphWidget.FrameSelected)
-        self.AddViewAction(viewMenu, "Frame All", "A",
-                           self.graphWidget.FrameAll)
-        self.AddViewAction(viewMenu, "Zoom In", "+",
-                           self.graphWidget.ZoomIn)
-        self.AddViewAction(viewMenu, "Zoom Out", "-",
-                           self.graphWidget.ZoomOut)
+        self.AddViewAction(
+            viewMenu, "Frame Selected", "F", self.graphWidget.FrameSelected
+        )
+        self.AddViewAction(
+            viewMenu, "Frame All", "A", self.graphWidget.FrameAll
+        )
+        self.AddViewAction(viewMenu, "Zoom In", "+", self.graphWidget.ZoomIn)
+        self.AddViewAction(viewMenu, "Zoom Out", "-", self.graphWidget.ZoomOut)
         viewMenu.addSeparator()
 
         outputMenu = viewMenu.addMenu("Filter Output")
 
-        noneOutputAction = outputMenu.addAction('None')
+        noneOutputAction = outputMenu.addAction("None")
         noneOutputAction.setCheckable(True)
         noneOutputAction.setChecked(self.selectedOutput is None)
-        noneOutputAction.triggered.connect(lambda *args: self.SwitchToOutput(None))
+        noneOutputAction.triggered.connect(
+            lambda *args: self.SwitchToOutput(None)
+        )
         outputMenu.addSeparator()
 
         outputs = self.nodeGraph.GetOutputs()
@@ -104,7 +106,7 @@ class GraphDockWidget(QtWidgets.QDockWidget):
         if isMaterial and mtlxSupported and self.selectedOutput is not None:
             outputName = self.selectedOutput.GetBaseName()
 
-            if outputName == 'mtlx:surface':
+            if outputName == "mtlx:surface":
                 a = toolsMenu.addAction("Bake to Texture...")
                 a.triggered.connect(self.ShowBakeMtlxDialog)
 
@@ -119,18 +121,17 @@ class GraphDockWidget(QtWidgets.QDockWidget):
 
     def SwitchToOutput(self, output):
         if output == self.selectedOutput:
-            return # Already showing, don't reset viewport
+            return  # Already showing, don't reset viewport
         self.selectedOutput = output
         self.UpdateContentForOutput()
 
     def UpdateContentForOutput(self):
         primPath = str(self.nodeGraph.GetPrim().GetPath())
-        outputStr = ''
+        outputStr = ""
         if self.selectedOutput is not None:
-            outputStr = f' ({self.selectedOutput.GetBaseName()})'
+            outputStr = f" ({self.selectedOutput.GetBaseName()})"
 
-        self.setWindowTitle(
-            f"{self.DEFAULT_TITLE}: {primPath}{outputStr}")
+        self.setWindowTitle(f"{self.DEFAULT_TITLE}: {primPath}{outputStr}")
 
         self.graphWidget.PopulateScene(self.nodeGraph, self.selectedOutput)
 
@@ -142,7 +143,7 @@ class GraphDockWidget(QtWidgets.QDockWidget):
             outputs = self.nodeGraph.GetOutputs()
 
             for output in outputs:
-                if 'surface' in output.GetBaseName():
+                if "surface" in output.GetBaseName():
                     return output
         return None
 
@@ -167,7 +168,8 @@ class GraphDockWidget(QtWidgets.QDockWidget):
         self.setFeatures(
             QtWidgets.QDockWidget.DockWidgetClosable
             | QtWidgets.QDockWidget.DockWidgetMovable
-            | QtWidgets.QDockWidget.DockWidgetFloatable)
+            | QtWidgets.QDockWidget.DockWidgetFloatable
+        )
 
         contentWidget = QtWidgets.QWidget(self)
         self.contentLayout = QtWidgets.QVBoxLayout(contentWidget)
@@ -175,8 +177,9 @@ class GraphDockWidget(QtWidgets.QDockWidget):
 
         self.placeholderLabel = QtWidgets.QLabel(
             "Right-click a Material or NodeGraph prim and choose "
-            "\"Show Node Graph\".",
-            contentWidget)
+            '"Show Node Graph".',
+            contentWidget,
+        )
         self.placeholderLabel.setAlignment(QtCore.Qt.AlignCenter)
         self.contentLayout.addWidget(self.placeholderLabel, 1)
 
@@ -186,9 +189,9 @@ class GraphDockWidget(QtWidgets.QDockWidget):
         self.graphWidget.hide()
 
         self.nodeGraph = None
-        self.historyStack = [] # push (ng, output) when we traverse into child NG
+        self.historyStack = []  # push (ng, output) when we traverse into child NG
 
-        self.resize(800, 600) # set default size
+        self.resize(800, 600)  # set default size
 
     def ShowNodeGraph(self, nodeGraph):
         if nodeGraph != self.nodeGraph:
@@ -197,7 +200,7 @@ class GraphDockWidget(QtWidgets.QDockWidget):
         self.raise_()
 
         # On Windows there's a bug where the scroll bars initially don't show.
-        if platform.system() == 'Windows':
+        if platform.system() == "Windows":
             QtCore.QTimer.singleShot(0, self.ForceInitialResize)
 
     def ForceInitialResize(self):
@@ -221,14 +224,18 @@ class UsdShadeViewDockState(StateSource):
     def Restore(self):
         if self.dockState:
             state = QtCore.QByteArray.fromBase64(
-                self.dockState.encode("ascii"))
+                self.dockState.encode("ascii")
+            )
             if not self._mainWindow.restoreState(state):
-                print("WARNING: failed to restore usdshadeview dock state",
-                      file=sys.stderr)
+                print(
+                    "WARNING: failed to restore usdshadeview dock state",
+                    file=sys.stderr,
+                )
 
         self._dockWidget.setVisible(self.dockVisible)
 
     def onSaveState(self, state):
         state["dockState"] = base64.b64encode(
-            self._mainWindow.saveState().data()).decode("ascii")
+            self._mainWindow.saveState().data()
+        ).decode("ascii")
         state["dockVisible"] = self._dockWidget.isVisible()
