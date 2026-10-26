@@ -163,17 +163,13 @@ class ShaderNode(GraphNode):
                 portLayout.addWidget(rowWidget)
                 self.outputPortWidgets[name] = rowWidget
 
-            # We only show outputs if their name is non-standard, indicating that there are multiple
-            elif not IsDefaultOutputPortName(name):
+            elif self.showAllOutputPorts or not IsDefaultOutputPortName(name):
                 nameWidget = QtWidgets.QLabel(name)
                 nameWidget.setAlignment(
                     QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter
                 )
                 portLayout.addWidget(nameWidget)
                 self.outputPortWidgets[name] = nameWidget
-
-            else:
-                self.outputPortWidgets[name] = self
 
         # Avoid whitespace because of paddding and margin when no input exists
         if portLayout.count():
@@ -196,8 +192,6 @@ class ShaderNode(GraphNode):
             w = self.inputPortWidgets[name]
             p = w.rect().center()
             y = w.mapToParent(p).y()
-        elif IsDefaultOutputPortName(name):
-            y = self.height() / 2
         elif name in self.outputPortWidgets:
             w = self.outputPortWidgets[name]
             p = w.rect().center()
@@ -216,12 +210,14 @@ class ShaderNode(GraphNode):
         ngChangeCallback=None,
         shaderOrNG=None,
         props=None,
+        showAllOutputPorts=False,
     ):
         super().__init__()
 
         self.ngChangeCallback = ngChangeCallback
         self.shaderOrNG = shaderOrNG
         self.nodeType = nodeType
+        self.showAllOutputPorts = showAllOutputPorts
 
         # We use these widgets to get the positions that the connector
         # widgets connect to (after layouting).
@@ -269,7 +265,7 @@ class ShaderNode(GraphNode):
         self.AddBody(inputs, outputs, props)
 
 
-def MakeSdrShaderNode(prim, ngChangeCallback):
+def MakeSdrShaderNode(prim, ngChangeCallback, showAllOutputPorts=False):
     shaderOrNG = UsdShade.Shader(prim)
     if not shaderOrNG:
         shaderOrNG = UsdShade.NodeGraph(prim)
@@ -293,6 +289,7 @@ def MakeSdrShaderNode(prim, ngChangeCallback):
         ngChangeCallback,
         shaderOrNG,
         props,
+        showAllOutputPorts,
     )
 
 

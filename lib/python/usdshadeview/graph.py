@@ -212,6 +212,7 @@ class GraphWidget(QtWidgets.QWidget):
         self.widgetMap = {}
         self.parentNgWidgetMap = {}
         self.scene = None
+        self.showAllOutputPorts = False
 
         self.graphView = GraphView()
 
@@ -368,7 +369,9 @@ class GraphWidget(QtWidgets.QWidget):
                 outputs = nodeGraph.GetOutputs()
                 w = MakeNgOutputNode(prim, outputs)
             else:
-                w = MakeSdrShaderNode(prim, self.ngChangeCallback)
+                w = MakeSdrShaderNode(
+                    prim, self.ngChangeCallback, self.showAllOutputPorts
+                )
 
             columnIndex = maxDepth - depth - 1
 
@@ -536,6 +539,12 @@ class GraphWidget(QtWidgets.QWidget):
 
     def SetHideScrollbars(self, hide):
         self.graphView.SetHideScrollbars(hide)
+
+    def GetShowAllOutputPorts(self):
+        return self.showAllOutputPorts
+
+    def SetShowAllOutputPorts(self, show):
+        self.showAllOutputPorts = bool(show)
 
     def FrameNodes(self, proxies):
         if self.scene is None:

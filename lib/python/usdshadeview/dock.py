@@ -57,10 +57,22 @@ class GraphDockWidget(QtWidgets.QDockWidget):
             self.window(),
             self.graphWidget.GetFitViewMargin(),
             self.graphWidget.GetHideScrollbars(),
+            self.graphWidget.GetShowAllOutputPorts(),
         )
-        if dialog.Run() == QtWidgets.QDialog.Accepted:
-            self.graphWidget.SetFitViewMargin(dialog.GetFitViewMargin())
-            self.graphWidget.SetHideScrollbars(dialog.GetHideScrollbars())
+        if dialog.Run() != QtWidgets.QDialog.Accepted:
+            return
+
+        self.graphWidget.SetFitViewMargin(dialog.GetFitViewMargin())
+        self.graphWidget.SetHideScrollbars(dialog.GetHideScrollbars())
+
+        showAllOutputPorts = dialog.GetShowAllOutputPorts()
+        if showAllOutputPorts == self.graphWidget.GetShowAllOutputPorts():
+            return
+
+        self.graphWidget.SetShowAllOutputPorts(showAllOutputPorts)
+        if self.nodeGraph is not None:
+            self.UpdateContentForOutput()
+            self.ScheduleFrameAll()
 
     def AddViewAction(self, menu, text, shortcut, callback):
         action = menu.addAction(text)
@@ -259,6 +271,9 @@ class UsdShadeViewDockState(StateSource):
         self.hideScrollbars = self.stateProperty(
             "hideScrollbars", default=False
         )
+        self.showAllOutputPorts = self.stateProperty(
+            "showAllOutputPorts", default=False
+        )
 
     def Restore(self):
         if self.dockState:
@@ -273,6 +288,9 @@ class UsdShadeViewDockState(StateSource):
 
         self._dockWidget.graphWidget.SetFitViewMargin(self.fitViewMargin)
         self._dockWidget.graphWidget.SetHideScrollbars(self.hideScrollbars)
+        self._dockWidget.graphWidget.SetShowAllOutputPorts(
+            self.showAllOutputPorts
+        )
         self._dockWidget.setVisible(self.dockVisible)
 
     def onSaveState(self, state):
@@ -284,3 +302,4 @@ class UsdShadeViewDockState(StateSource):
         graphWidget = self._dockWidget.graphWidget
         state["fitViewMargin"] = graphWidget.GetFitViewMargin()
         state["hideScrollbars"] = graphWidget.GetHideScrollbars()
+        state["showAllOutputPorts"] = graphWidget.GetShowAllOutputPorts()

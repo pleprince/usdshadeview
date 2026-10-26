@@ -316,7 +316,9 @@ def OpenNodeDefDialog(ndId):
 
 
 class PreferencesDialog(QtWidgets.QDialog):
-    def __init__(self, parent, fitViewMargin, hideScrollbars):
+    def __init__(
+        self, parent, fitViewMargin, hideScrollbars, showAllOutputPorts
+    ):
         super().__init__(parent)
 
         self.setWindowTitle("Preferences")
@@ -340,9 +342,17 @@ class PreferencesDialog(QtWidgets.QDialog):
             "Hide the scrollbars around the node graph view."
         )
 
+        self.showAllOutputPorts = QtWidgets.QCheckBox("Show all output ports")
+        self.showAllOutputPorts.setChecked(showAllOutputPorts)
+        self.showAllOutputPorts.setToolTip(
+            "Show output rows on nodes even for single ports with "
+            "default names such as 'out' or 'result'."
+        )
+
         layout = QtWidgets.QVBoxLayout()
         layout.addLayout(formLayout)
         layout.addWidget(self.hideScrollbars)
+        layout.addWidget(self.showAllOutputPorts)
 
         buttonBox = QtWidgets.QDialogButtonBox(
             QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel
@@ -359,6 +369,9 @@ class PreferencesDialog(QtWidgets.QDialog):
 
     def GetHideScrollbars(self):
         return self.hideScrollbars.isChecked()
+
+    def GetShowAllOutputPorts(self):
+        return self.showAllOutputPorts.isChecked()
 
     def Run(self):
         if PySideModule == "PySide6":
