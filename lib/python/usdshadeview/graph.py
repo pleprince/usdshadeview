@@ -129,18 +129,32 @@ class GraphView(QtWidgets.QGraphicsView):
         for item in items:
             rect = rect.united(item.sceneBoundingRect())
 
-        if rect.isEmpty():
+        if rect.isEmpty():          # also guards a 0-width/height rect
             return
 
-        margin = 40.0
-        rect.adjust(-margin, -margin, margin, margin)
-        self.fitInView(rect, QtCore.Qt.KeepAspectRatio)
+        margin = 20.0               # desired margin, in viewport pixels
 
+        viewport = self.viewport().rect()
+        availWidth = viewport.width() - 2.0 * margin
+        availHeight = viewport.height() - 2.0 * margin
+        if availWidth <= 0.0 or availHeight <= 0.0:
+            return
+
+        fitScale = min(
+            availWidth / rect.width(),
+            availHeight / rect.height(),
+        )
+
+        # Viewport pixels -> scene units at the scale fitInView will apply.
+        sceneMargin = margin / fitScale
+
+        rect.adjust(-sceneMargin, -sceneMargin, sceneMargin, sceneMargin)
+        self.fitInView(rect, QtCore.Qt.KeepAspectRatio)
     def drawBackground(self, painter, rect):
         # Fill background; needed for HW acceleleration
         viewportRect = self.viewport().rect()
         sceneRect = self.mapToScene(viewportRect).boundingRect()
-        painter.fillRect(sceneRect, QtGui.QColor("#383838"))
+        painter.fillRect(sceneRect, QtGui.QColor(UIColors.CHARCOAL))
 
         # Draw grid lines
         lineColor = QtGui.QColor(UIColors.DARK_GREY)
