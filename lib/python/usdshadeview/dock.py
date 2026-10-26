@@ -276,22 +276,30 @@ class UsdShadeViewDockState(StateSource):
         )
 
     def Restore(self):
-        if self.dockState:
-            state = QtCore.QByteArray.fromBase64(
-                self.dockState.encode("ascii")
-            )
-            if not self._mainWindow.restoreState(state):
-                print(
-                    "WARNING: failed to restore usdshadeview dock state",
-                    file=sys.stderr,
+        # Show a restored floating dock without activating it: otherwise its
+        # window becomes key and usdview's menu bar is replaced (macOS).
+        self._dockWidget.setAttribute(QtCore.Qt.WA_ShowWithoutActivating, True)
+        try:
+            if self.dockState:
+                state = QtCore.QByteArray.fromBase64(
+                    self.dockState.encode("ascii")
                 )
+                if not self._mainWindow.restoreState(state):
+                    print(
+                        "WARNING: failed to restore usdshadeview dock state",
+                        file=sys.stderr,
+                    )
 
-        self._dockWidget.graphWidget.SetFitViewMargin(self.fitViewMargin)
-        self._dockWidget.graphWidget.SetHideScrollbars(self.hideScrollbars)
-        self._dockWidget.graphWidget.SetShowAllOutputPorts(
-            self.showAllOutputPorts
-        )
-        self._dockWidget.setVisible(self.dockVisible)
+            self._dockWidget.graphWidget.SetFitViewMargin(self.fitViewMargin)
+            self._dockWidget.graphWidget.SetHideScrollbars(self.hideScrollbars)
+            self._dockWidget.graphWidget.SetShowAllOutputPorts(
+                self.showAllOutputPorts
+            )
+            self._dockWidget.setVisible(self.dockVisible)
+        finally:
+            self._dockWidget.setAttribute(
+                QtCore.Qt.WA_ShowWithoutActivating, False
+            )
 
     def onSaveState(self, state):
         state["dockState"] = base64.b64encode(
