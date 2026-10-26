@@ -53,7 +53,7 @@ The panel can be shown by **right clicking** a prim of one of both types, which 
 
 The panel can be docked anywhere in the usdview main window, floated as a separate window, or closed. Its docking layout and visibility are stored in usdview's preferences, so they are restored on the next launch. It can also be toggled from the usdview menu bar _Window_ → _UsdShade Node Graph_.
 
-The network shown in the panel has a layout depending on network topology, and node colors are based on the classification (USDA, MaterialX, MDL, OSL, node graph, unknown). Child node graphs can be entered using the "E" button.
+The network shown in the panel has a layout depending on network topology, and node colors are based on the classification (USDA, MaterialX, MDL, OSL, node graph, unknown). Connection ports are marked with right-pointing triangles in the same color as the connecting splines. Child node graphs can be entered using the "E" button.
 
 Nodes can be selected by clicking them; hold **Shift** to select multiple. Press **F** to frame the selected nodes and **A** to frame the whole graph. Use the mouse wheel (centered on the cursor) or the **+** and **-** keys to zoom in and out. These shortcuts only apply while the panel is focused or under the cursor, so they do not interfere with usdview's own **F** shortcut.
 

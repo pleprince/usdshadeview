@@ -67,6 +67,9 @@ BORDER_WIDGET_STYLE = f"""
     }}
 """
 
+# Connections and their port markers share this color.
+SPLINE_COLOR = "#ffffff"
+
 SELECTED_NODE_STYLE = f"""
     QWidget#ThisWidget {{
         background-color: #454545;

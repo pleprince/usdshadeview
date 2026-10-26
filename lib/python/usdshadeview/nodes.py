@@ -17,12 +17,13 @@
 """Node widgets and their factory functions."""
 
 from pxr import Sdr, Usd, UsdShade
-from pxr.Usdviewq.qt import QtCore, QtWidgets
+from pxr.Usdviewq.qt import QtCore, QtGui, QtWidgets
 
 from .constants import (
     AUX_BUTTON_STYLE,
     BORDER_WIDGET_STYLE,
     SELECTED_NODE_STYLE,
+    SPLINE_COLOR,
     NodeColors,
     NodeType,
     PortType,
@@ -91,6 +92,8 @@ class GraphNode(QtWidgets.QFrame):
 
 
 class ShaderNode(GraphNode):
+    PORT_TRIANGLE_SIZE = 7.0
+
     def AddBody(self, inputs, outputs, props):
         portLayout = QtWidgets.QVBoxLayout()
         portLayout.setContentsMargins(8, 10, 8, 8)
@@ -191,11 +194,11 @@ class ShaderNode(GraphNode):
         if portType == PortType.INPUT:
             w = self.inputPortWidgets[name]
             p = w.rect().center()
-            y = w.mapToParent(p).y()
+            y = w.mapTo(self, p).y()
         elif name in self.outputPortWidgets:
             w = self.outputPortWidgets[name]
             p = w.rect().center()
-            y = w.mapToParent(p).y()
+            y = w.mapTo(self, p).y()
         else:
             y = self.height() / 2
 
@@ -218,6 +221,7 @@ class ShaderNode(GraphNode):
         self.shaderOrNG = shaderOrNG
         self.nodeType = nodeType
         self.showAllOutputPorts = showAllOutputPorts
+        self.outputPortNames = [i.GetBaseName() for i in outputs]
 
         # We use these widgets to get the positions that the connector
         # widgets connect to (after layouting).
@@ -263,6 +267,15 @@ class ShaderNode(GraphNode):
             nodeName, typeName, headerColor, auxButtonText, auxButtonTooltip
         )
         self.AddBody(inputs, outputs, props)
+
+    def GetPortDescriptors(self):
+        descriptors = [
+            (PortType.INPUT, name) for name in self.inputPortWidgets
+        ]
+        descriptors.extend(
+            (PortType.OUTPUT, name) for name in self.outputPortNames
+        )
+        return descriptors
 
 
 def MakeSdrShaderNode(prim, ngChangeCallback, showAllOutputPorts=False):

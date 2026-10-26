@@ -26,6 +26,7 @@ from .connections import SplineConnectionWidget
 from .constants import (
     DEFAULT_FIT_VIEW_MARGIN,
     MAX_NODE_GRAPH_DEPTH,
+    SPLINE_COLOR,
     UIColors,
 )
 from .nodes import (
@@ -213,6 +214,9 @@ class GraphWidget(QtWidgets.QWidget):
         self.parentNgWidgetMap = {}
         self.scene = None
         self.showAllOutputPorts = False
+        self.portMarkers = []
+        self.portMarkerProxyMap = {}
+        self.portMarkerUpdatePending = False
 
         self.graphView = GraphView()
 
@@ -349,6 +353,7 @@ class GraphWidget(QtWidgets.QWidget):
             proxy.setWidget(widget)
             proxy.setZValue(1)  # Render nodes on top of lines
             columns[columnIndex].addItem(proxy)
+            self.CreatePortMarkers(proxy, widget)
             return proxy
 
         # Insert the node representing the parent node graph inputs
@@ -437,6 +442,8 @@ class GraphWidget(QtWidgets.QWidget):
 
         self.nodeGraph = nodeGraph
         self.scene = QtWidgets.QGraphicsScene(self)
+        self.portMarkers = []
+        self.portMarkerProxyMap = {}
 
         rootPrim = nodeGraph.GetPrim()
         rootInputs = (
@@ -477,8 +484,49 @@ class GraphWidget(QtWidgets.QWidget):
         graphWidget.setLayout(self.graphLayout)
         self.scene.addItem(graphWidget)
 
+        self.SchedulePortMarkerUpdate()
         self.graphView.setScene(self.scene)
         self.UpdateNodeFilterTargets()
+
+    def CreatePortMarkers(self, proxy, widget):
+        for portType, name in widget.GetPortDescriptors():
+            marker = QtWidgets.QGraphicsPolygonItem()
+            marker.setPen(QtGui.QPen(QtCore.Qt.NoPen))
+            marker.setBrush(QtGui.QColor(SPLINE_COLOR))
+            marker.setAcceptedMouseButtons(QtCore.Qt.NoButton)
+            marker.setZValue(2)
+            self.scene.addItem(marker)
+            self.portMarkers.append((proxy, widget, portType, name, marker))
+            self.portMarkerProxyMap[marker] = proxy
+
+        proxy.geometryChanged.connect(self.SchedulePortMarkerUpdate)
+
+    def SchedulePortMarkerUpdate(self):
+        if self.portMarkerUpdatePending:
+            return
+
+        self.portMarkerUpdatePending = True
+        QtCore.QTimer.singleShot(0, self.UpdatePortMarkersOnIdle)
+
+    def UpdatePortMarkersOnIdle(self):
+        self.portMarkerUpdatePending = False
+        self.UpdatePortMarkers()
+
+    def UpdatePortMarkers(self):
+        for proxy, widget, portType, name, marker in self.portMarkers:
+            size = widget.PORT_TRIANGLE_SIZE
+            half = size / 2.0
+            position = proxy.mapToScene(widget.GetPortPosition(name, portType))
+            x = position.x() - half
+            marker.setPolygon(
+                QtGui.QPolygonF(
+                    [
+                        QtCore.QPointF(x, position.y() - half),
+                        QtCore.QPointF(x, position.y() + half),
+                        QtCore.QPointF(x + size, position.y()),
+                    ]
+                )
+            )
 
     def GetAllNodeProxies(self):
         return list(self.widgetMap.values()) + list(
@@ -632,8 +680,11 @@ class GraphWidget(QtWidgets.QWidget):
                 and obj is self.graphView.viewport()
             ):
                 item = self.graphView.itemAt(event.pos())
-                if item in self.GetAllNodeProxies():
-                    self.SelectNode(item, event.modifiers())
+                proxy = self.portMarkerProxyMap.get(item)
+                if proxy is None and item in self.GetAllNodeProxies():
+                    proxy = item
+                if proxy is not None:
+                    self.SelectNode(proxy, event.modifiers())
                 else:
                     self.ClearSelection()
 

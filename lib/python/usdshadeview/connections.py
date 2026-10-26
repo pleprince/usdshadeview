@@ -18,7 +18,7 @@
 
 from pxr.Usdviewq.qt import QtCore, QtGui, QtWidgets
 
-from .constants import PortType
+from .constants import SPLINE_COLOR, PortType
 
 
 class ConnectionWidget:
@@ -32,7 +32,7 @@ class ConnectionWidget:
         self.startNode.geometryChanged.connect(self.UpdateGeometry)
         self.endNode.geometryChanged.connect(self.UpdateGeometry)
 
-        self.setPen(QtGui.QPen(QtCore.Qt.white, 1.0))
+        self.setPen(QtGui.QPen(QtGui.QColor(SPLINE_COLOR), 1.0))
         self.UpdateGeometry()
 
     def UpdateGeometry(self):
