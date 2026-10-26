@@ -139,6 +139,7 @@ class GraphDockWidget(QtWidgets.QDockWidget):
             return  # Already showing, don't reset viewport
         self.selectedOutput = output
         self.UpdateContentForOutput()
+        self.ScheduleFrameAll()
 
     def UpdateContentForOutput(self):
         primPath = str(self.nodeGraph.GetPrim().GetPath())
@@ -175,6 +176,20 @@ class GraphDockWidget(QtWidgets.QDockWidget):
 
         self.UpdateContentForOutput()
 
+        if nodeGraph.GetPrim().IsA(UsdShade.Material):
+            self.ScheduleFrameAll()
+
+    def ScheduleFrameAll(self):
+        self.frameRequestId += 1
+        requestId = self.frameRequestId
+        QtCore.QTimer.singleShot(0, lambda: self.FrameAllOnIdle(requestId))
+
+    def FrameAllOnIdle(self, requestId):
+        if requestId != self.frameRequestId:
+            return
+
+        self.graphWidget.FrameAll()
+
     def __init__(self, mainWindow):
         super().__init__(self.DEFAULT_TITLE, mainWindow)
 
@@ -205,6 +220,7 @@ class GraphDockWidget(QtWidgets.QDockWidget):
 
         self.nodeGraph = None
         self.historyStack = []  # push (ng, output) when we traverse into child NG
+        self.frameRequestId = 0
 
         self.resize(800, 600)  # set default size
 
