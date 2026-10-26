@@ -57,6 +57,8 @@ The network shown in the panel has a layout depending on network topology, and n
 
 Nodes can be selected by clicking them; hold **Shift** to select multiple. Press **F** to frame the selected nodes and **A** to frame the whole graph. Use the mouse wheel (centered on the cursor) or the **+** and **-** keys to zoom in and out. These shortcuts only apply while the panel is focused or under the cursor, so they do not interfere with usdview's own **F** shortcut.
 
+The margin used when framing can be changed under _Tools_ → _Preferences..._ and is remembered across sessions.
+
 It is also possible to **right click** value widgets, which exposes following actions:
 
 <img width="277" height="144" src="https://github.com/user-attachments/assets/d6841521-b734-45d0-92fb-c391674ab653" />

@@ -25,7 +25,8 @@ from pxr.Usdviewq.qt import QtCore, QtGui, QtWidgets
 from pxr.Usdviewq.settings import StateSource
 
 from .compat import mtlxSupported
-from .dialogs import BakeMtlxDialog
+from .constants import DEFAULT_FIT_VIEW_MARGIN
+from .dialogs import BakeMtlxDialog, PreferencesDialog
 from .graph import GraphWidget
 
 
@@ -50,6 +51,13 @@ class GraphDockWidget(QtWidgets.QDockWidget):
         if filePath:
             image = self.graphWidget.RenderSceneToImage()
             image.save(filePath)
+
+    def ShowPreferencesDialog(self):
+        dialog = PreferencesDialog(
+            self.window(), self.graphWidget.GetFitViewMargin()
+        )
+        if dialog.Run() == QtWidgets.QDialog.Accepted:
+            self.graphWidget.SetFitViewMargin(dialog.GetFitViewMargin())
 
     def AddViewAction(self, menu, text, shortcut, callback):
         action = menu.addAction(text)
@@ -112,6 +120,10 @@ class GraphDockWidget(QtWidgets.QDockWidget):
 
         exportAction = toolsMenu.addAction("Export as Image...")
         exportAction.triggered.connect(self.ShowExportAsImageDialog)
+
+        toolsMenu.addSeparator()
+        preferencesAction = toolsMenu.addAction("Preferences...")
+        preferencesAction.triggered.connect(self.ShowPreferencesDialog)
 
         self.contentLayout.setMenuBar(menuBar)
 
@@ -210,7 +222,7 @@ class GraphDockWidget(QtWidgets.QDockWidget):
 
 
 class UsdShadeViewDockState(StateSource):
-    """Persists the node graph dock layout in usdview's state file."""
+    """Persists the node graph dock layout and preferences."""
 
     def __init__(self, settings, mainWindow, dockWidget):
         super().__init__(settings, "usdshadeview")
@@ -220,6 +232,11 @@ class UsdShadeViewDockState(StateSource):
 
         self.dockState = self.stateProperty("dockState", default="")
         self.dockVisible = self.stateProperty("dockVisible", default=False)
+        self.fitViewMargin = self.stateProperty(
+            "fitViewMargin",
+            default=DEFAULT_FIT_VIEW_MARGIN,
+            validator=lambda value: value >= 0.0,
+        )
 
     def Restore(self):
         if self.dockState:
@@ -232,6 +249,7 @@ class UsdShadeViewDockState(StateSource):
                     file=sys.stderr,
                 )
 
+        self._dockWidget.graphWidget.SetFitViewMargin(self.fitViewMargin)
         self._dockWidget.setVisible(self.dockVisible)
 
     def onSaveState(self, state):
@@ -239,3 +257,6 @@ class UsdShadeViewDockState(StateSource):
             self._mainWindow.saveState().data()
         ).decode("ascii")
         state["dockVisible"] = self._dockWidget.isVisible()
+
+        graphWidget = self._dockWidget.graphWidget
+        state["fitViewMargin"] = graphWidget.GetFitViewMargin()

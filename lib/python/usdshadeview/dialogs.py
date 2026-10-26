@@ -315,6 +315,47 @@ def OpenNodeDefDialog(ndId):
         d.show()
 
 
+class PreferencesDialog(QtWidgets.QDialog):
+    def __init__(self, parent, fitViewMargin):
+        super().__init__(parent)
+
+        self.setWindowTitle("Preferences")
+
+        formLayout = QtWidgets.QFormLayout()
+
+        self.fitViewMargin = QtWidgets.QDoubleSpinBox()
+        self.fitViewMargin.setRange(0.0, 200.0)
+        self.fitViewMargin.setDecimals(1)
+        self.fitViewMargin.setSingleStep(5.0)
+        self.fitViewMargin.setValue(fitViewMargin)
+        self.fitViewMargin.setSuffix(" px")
+        self.fitViewMargin.setToolTip(
+            "Margin added around the nodes when framing the graph."
+        )
+        formLayout.addRow("Fit view margin:", self.fitViewMargin)
+
+        layout = QtWidgets.QVBoxLayout()
+        layout.addLayout(formLayout)
+
+        buttonBox = QtWidgets.QDialogButtonBox(
+            QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel
+        )
+        buttonBox.accepted.connect(self.accept)
+        buttonBox.rejected.connect(self.reject)
+        layout.addWidget(buttonBox)
+
+        self.setLayout(layout)
+        self.setFixedWidth(self.sizeHint().width() * 1.5)
+
+    def GetFitViewMargin(self):
+        return self.fitViewMargin.value()
+
+    def Run(self):
+        if PySideModule == "PySide6":
+            return self.exec()
+        return self.exec_()
+
+
 class ValueArrayDialog(QtWidgets.QDialog):
     def __init__(self, values):
         super().__init__()

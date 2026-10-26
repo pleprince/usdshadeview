@@ -23,7 +23,11 @@ from pxr.Usdviewq.qt import QGLFormat, QGLWidget, QtCore, QtGui, QtWidgets
 
 from .compat import PySideModule, enableHwAcceleration
 from .connections import SplineConnectionWidget
-from .constants import MAX_NODE_GRAPH_DEPTH, UIColors
+from .constants import (
+    DEFAULT_FIT_VIEW_MARGIN,
+    MAX_NODE_GRAPH_DEPTH,
+    UIColors,
+)
 from .nodes import (
     GraphNode,
     MakeNgInputNode,
@@ -39,6 +43,8 @@ class GraphView(QtWidgets.QGraphicsView):
 
     def __init__(self):
         super().__init__()
+
+        self.fitViewMargin = DEFAULT_FIT_VIEW_MARGIN
 
         self.setDragMode(QtWidgets.QGraphicsView.ScrollHandDrag)
         self.setRenderHints(
@@ -129,10 +135,10 @@ class GraphView(QtWidgets.QGraphicsView):
         for item in items:
             rect = rect.united(item.sceneBoundingRect())
 
-        if rect.isEmpty():          # also guards a 0-width/height rect
+        if rect.isEmpty():  # also guards a 0-width/height rect
             return
 
-        margin = 20.0               # desired margin, in viewport pixels
+        margin = self.fitViewMargin  # desired margin, in viewport pixels
 
         viewport = self.viewport().rect()
         availWidth = viewport.width() - 2.0 * margin
@@ -150,6 +156,13 @@ class GraphView(QtWidgets.QGraphicsView):
 
         rect.adjust(-sceneMargin, -sceneMargin, sceneMargin, sceneMargin)
         self.fitInView(rect, QtCore.Qt.KeepAspectRatio)
+
+    def GetFitViewMargin(self):
+        return self.fitViewMargin
+
+    def SetFitViewMargin(self, margin):
+        self.fitViewMargin = max(0.0, float(margin))
+
     def drawBackground(self, painter, rect):
         # Fill background; needed for HW acceleleration
         viewportRect = self.viewport().rect()
@@ -497,6 +510,12 @@ class GraphWidget(QtWidgets.QWidget):
 
     def ZoomOut(self):
         self.graphView.ZoomOut()
+
+    def GetFitViewMargin(self):
+        return self.graphView.GetFitViewMargin()
+
+    def SetFitViewMargin(self, margin):
+        self.graphView.SetFitViewMargin(margin)
 
     def FrameNodes(self, proxies):
         if self.scene is None:

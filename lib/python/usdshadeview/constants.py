@@ -21,6 +21,9 @@ from enum import Enum
 # Abortion criterium for circular node graphs
 MAX_NODE_GRAPH_DEPTH = 80
 
+# Fit view margin, in viewport pixels.
+DEFAULT_FIT_VIEW_MARGIN = 20.0
+
 
 class UIColors(str, Enum):
     GOLD = "#c39a46"
