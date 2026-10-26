@@ -316,7 +316,7 @@ def OpenNodeDefDialog(ndId):
 
 
 class PreferencesDialog(QtWidgets.QDialog):
-    def __init__(self, parent, fitViewMargin):
+    def __init__(self, parent, fitViewMargin, hideScrollbars):
         super().__init__(parent)
 
         self.setWindowTitle("Preferences")
@@ -334,8 +334,15 @@ class PreferencesDialog(QtWidgets.QDialog):
         )
         formLayout.addRow("Fit view margin:", self.fitViewMargin)
 
+        self.hideScrollbars = QtWidgets.QCheckBox("Hide scrollbars")
+        self.hideScrollbars.setChecked(hideScrollbars)
+        self.hideScrollbars.setToolTip(
+            "Hide the scrollbars around the node graph view."
+        )
+
         layout = QtWidgets.QVBoxLayout()
         layout.addLayout(formLayout)
+        layout.addWidget(self.hideScrollbars)
 
         buttonBox = QtWidgets.QDialogButtonBox(
             QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel
@@ -349,6 +356,9 @@ class PreferencesDialog(QtWidgets.QDialog):
 
     def GetFitViewMargin(self):
         return self.fitViewMargin.value()
+
+    def GetHideScrollbars(self):
+        return self.hideScrollbars.isChecked()
 
     def Run(self):
         if PySideModule == "PySide6":

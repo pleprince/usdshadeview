@@ -54,10 +54,13 @@ class GraphDockWidget(QtWidgets.QDockWidget):
 
     def ShowPreferencesDialog(self):
         dialog = PreferencesDialog(
-            self.window(), self.graphWidget.GetFitViewMargin()
+            self.window(),
+            self.graphWidget.GetFitViewMargin(),
+            self.graphWidget.GetHideScrollbars(),
         )
         if dialog.Run() == QtWidgets.QDialog.Accepted:
             self.graphWidget.SetFitViewMargin(dialog.GetFitViewMargin())
+            self.graphWidget.SetHideScrollbars(dialog.GetHideScrollbars())
 
     def AddViewAction(self, menu, text, shortcut, callback):
         action = menu.addAction(text)
@@ -237,6 +240,9 @@ class UsdShadeViewDockState(StateSource):
             default=DEFAULT_FIT_VIEW_MARGIN,
             validator=lambda value: value >= 0.0,
         )
+        self.hideScrollbars = self.stateProperty(
+            "hideScrollbars", default=False
+        )
 
     def Restore(self):
         if self.dockState:
@@ -250,6 +256,7 @@ class UsdShadeViewDockState(StateSource):
                 )
 
         self._dockWidget.graphWidget.SetFitViewMargin(self.fitViewMargin)
+        self._dockWidget.graphWidget.SetHideScrollbars(self.hideScrollbars)
         self._dockWidget.setVisible(self.dockVisible)
 
     def onSaveState(self, state):
@@ -260,3 +267,4 @@ class UsdShadeViewDockState(StateSource):
 
         graphWidget = self._dockWidget.graphWidget
         state["fitViewMargin"] = graphWidget.GetFitViewMargin()
+        state["hideScrollbars"] = graphWidget.GetHideScrollbars()

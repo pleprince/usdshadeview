@@ -45,6 +45,7 @@ class GraphView(QtWidgets.QGraphicsView):
         super().__init__()
 
         self.fitViewMargin = DEFAULT_FIT_VIEW_MARGIN
+        self.hideScrollbars = False
 
         self.setDragMode(QtWidgets.QGraphicsView.ScrollHandDrag)
         self.setRenderHints(
@@ -162,6 +163,19 @@ class GraphView(QtWidgets.QGraphicsView):
 
     def SetFitViewMargin(self, margin):
         self.fitViewMargin = max(0.0, float(margin))
+
+    def GetHideScrollbars(self):
+        return self.hideScrollbars
+
+    def SetHideScrollbars(self, hide):
+        self.hideScrollbars = bool(hide)
+        policy = (
+            QtCore.Qt.ScrollBarAlwaysOff
+            if self.hideScrollbars
+            else QtCore.Qt.ScrollBarAsNeeded
+        )
+        self.setHorizontalScrollBarPolicy(policy)
+        self.setVerticalScrollBarPolicy(policy)
 
     def drawBackground(self, painter, rect):
         # Fill background; needed for HW acceleleration
@@ -516,6 +530,12 @@ class GraphWidget(QtWidgets.QWidget):
 
     def SetFitViewMargin(self, margin):
         self.graphView.SetFitViewMargin(margin)
+
+    def GetHideScrollbars(self):
+        return self.graphView.GetHideScrollbars()
+
+    def SetHideScrollbars(self, hide):
+        self.graphView.SetHideScrollbars(hide)
 
     def FrameNodes(self, proxies):
         if self.scene is None:
