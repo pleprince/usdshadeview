@@ -72,7 +72,6 @@ class GraphDockWidget(QtWidgets.QDockWidget):
         self.graphWidget.SetShowAllOutputPorts(showAllOutputPorts)
         if self.nodeGraph is not None:
             self.UpdateContentForOutput()
-            self.ScheduleFrameAll()
 
     def AddViewAction(self, menu, text, shortcut, callback):
         action = menu.addAction(text)
@@ -151,7 +150,6 @@ class GraphDockWidget(QtWidgets.QDockWidget):
             return  # Already showing, don't reset viewport
         self.selectedOutput = output
         self.UpdateContentForOutput()
-        self.ScheduleFrameAll()
 
     def UpdateContentForOutput(self):
         primPath = str(self.nodeGraph.GetPrim().GetPath())
@@ -164,6 +162,7 @@ class GraphDockWidget(QtWidgets.QDockWidget):
         self.graphWidget.PopulateScene(self.nodeGraph, self.selectedOutput)
 
         self.UpdateMenuBar()
+        self.ScheduleFrameAll()
 
     def GetDefaultOutput(self):
         # For materials, we try to select the 'surface' output. For NGs, none.
@@ -187,7 +186,6 @@ class GraphDockWidget(QtWidgets.QDockWidget):
         self.graphWidget.show()
 
         self.UpdateContentForOutput()
-        self.ScheduleFrameAll()
 
     def ScheduleFrameAll(self):
         self.frameRequestId += 1
