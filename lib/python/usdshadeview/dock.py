@@ -187,9 +187,7 @@ class GraphDockWidget(QtWidgets.QDockWidget):
         self.graphWidget.show()
 
         self.UpdateContentForOutput()
-
-        if nodeGraph.GetPrim().IsA(UsdShade.Material):
-            self.ScheduleFrameAll()
+        self.ScheduleFrameAll()
 
     def ScheduleFrameAll(self):
         self.frameRequestId += 1
