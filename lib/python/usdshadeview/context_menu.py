@@ -37,13 +37,4 @@ class ShowUsdShadeGraphContextMenuItem(PrimContextMenuItem):
         return "Show Node Graph"
 
     def RunCommand(self):
-        prim = self.GetFocusedPrim()
-        nodeGraph = UsdShade.NodeGraph(
-            prim
-        )  # UsdShade.Material inherits from NodeGraph
-        outputs = nodeGraph.GetOutputs()
-
-        if not outputs:
-            return
-
-        self.viewContainer.ShowNodeGraph(nodeGraph)
+        self.viewContainer.ShowNodeGraphForPrim(self.GetFocusedPrim())

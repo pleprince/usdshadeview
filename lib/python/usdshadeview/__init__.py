@@ -18,10 +18,10 @@
 
 import platform
 
-from pxr import Sdr, Tf, Usd
+from pxr import Sdr, Tf, Usd, UsdShade
 from pxr.Usdviewq.plugin import PluginContainer
 from pxr.Usdviewq.primContextMenu import PrimContextMenu
-from pxr.Usdviewq.qt import QtCore
+from pxr.Usdviewq.qt import QtCore, QtGui
 
 # Re-exported so existing imports of the plugin module keep working.
 from .compat import (
@@ -139,9 +139,16 @@ class UsdShadeViewContainer(PluginContainer):
     def CreateDockWidget(self, windowMenu):
         mainWindow = self.usdviewApi.qMainWindow
 
+        self.showNodeGraphAction = QtGui.QAction("Show Node Graph", mainWindow)
+        self.showNodeGraphAction.triggered.connect(self.ShowSelectedNodeGraph)
+        mainWindow.addAction(self.showNodeGraphAction)
+
         self.dockWidget = GraphDockWidget(mainWindow)
         mainWindow.addDockWidget(
             QtCore.Qt.RightDockWidgetArea, self.dockWidget
+        )
+        self.dockWidget.showNodeGraphShortcutChanged.connect(
+            self.SetShowNodeGraphShortcut
         )
 
         dockAction = windowMenu.addItem(self.toggleDockCommand)
@@ -153,6 +160,13 @@ class UsdShadeViewContainer(PluginContainer):
             self.GetSettingsSource(), mainWindow, self.dockWidget
         )
         dockState.Restore()
+
+        self.SetShowNodeGraphShortcut(
+            self.dockWidget.GetShowNodeGraphShortcut()
+        )
+
+    def SetShowNodeGraphShortcut(self, shortcut):
+        self.showNodeGraphAction.setShortcut(QtGui.QKeySequence(shortcut))
 
     def GetSettingsSource(self):
         getSettings = getattr(self.usdviewApi, "GetSettings", None)
@@ -172,6 +186,22 @@ class UsdShadeViewContainer(PluginContainer):
     def ShowNodeGraph(self, nodeGraph):
         self.dockWidget.ShowNodeGraph(nodeGraph)
 
+    def ShowNodeGraphForPrim(self, prim):
+        if prim is None or not (
+            prim.IsA(UsdShade.Material) or prim.IsA(UsdShade.NodeGraph)
+        ):
+            return
+
+        # UsdShade.Material inherits from UsdShade.NodeGraph.
+        nodeGraph = UsdShade.NodeGraph(prim)
+        if not nodeGraph.GetOutputs():
+            return
+
+        self.ShowNodeGraph(nodeGraph)
+
+    def ShowSelectedNodeGraph(self):
+        self.ShowNodeGraphForPrim(self.usdviewApi.prim)
+
     def hijackPrimContextMenu(self):
         usdviewApi = self.usdviewApi
         viewContainer = self
@@ -190,6 +220,14 @@ class UsdShadeViewContainer(PluginContainer):
 
             action = self.addAction(menuItem.GetText())
             action.setEnabled(menuItem.IsEnabled())
+            action.setShortcut(
+                QtGui.QKeySequence(
+                    viewContainer.dockWidget.GetShowNodeGraphShortcut()
+                )
+            )
+            # The main window hosts the globally active shortcut; this one
+            # only provides the label while the context menu is open.
+            action.setShortcutContext(QtCore.Qt.WidgetShortcut)
             action.triggered.connect(lambda value: menuItem.RunCommand())
 
         PrimContextMenu.__init__ = trampolineInitMethod

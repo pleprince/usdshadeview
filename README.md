@@ -47,7 +47,7 @@ usdshadeview visualizes [UsdShade NodeGraphs](https://openusd.org/release/api/cl
   <img width="1959" height="559" src="https://github.com/user-attachments/assets/0d686165-0eed-49ea-98f4-26b0d65a2b42" />
 </p>
 
-The panel can be shown by **right clicking** a prim of one of both types, which brings up a new option in the context menu:
+The panel can be shown by **right clicking** a prim of one of both types, which brings up a new option in the context menu. The same action can be triggered with **Ctrl+M** (configurable under _Tools_ → _Preferences..._) while a material or node graph prim is selected:
 
 <img width="484" height="330" src="https://github.com/user-attachments/assets/eaf5291b-cda6-4585-8dcd-6e4470c8fddf" />
 

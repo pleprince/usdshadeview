@@ -19,7 +19,7 @@
 import os
 
 from pxr import Sdr, Usd
-from pxr.Usdviewq.qt import QtCore, QtWidgets
+from pxr.Usdviewq.qt import QtCore, QtGui, QtWidgets
 from pxr.Usdviewq.scalarTypes import ToString
 
 from .compat import PySideModule, UsdBakeMtlx
@@ -317,13 +317,28 @@ def OpenNodeDefDialog(ndId):
 
 class PreferencesDialog(QtWidgets.QDialog):
     def __init__(
-        self, parent, fitViewMargin, hideScrollbars, showAllOutputPorts
+        self,
+        parent,
+        fitViewMargin,
+        hideScrollbars,
+        showAllOutputPorts,
+        showNodeGraphShortcut,
     ):
         super().__init__(parent)
 
         self.setWindowTitle("Preferences")
 
         formLayout = QtWidgets.QFormLayout()
+
+        self.showNodeGraphShortcut = QtWidgets.QKeySequenceEdit(
+            QtGui.QKeySequence(showNodeGraphShortcut)
+        )
+        self.showNodeGraphShortcut.setToolTip(
+            'Keyboard shortcut for the "Show Node Graph" context menu action.'
+        )
+        formLayout.addRow(
+            "Show Node Graph shortcut:", self.showNodeGraphShortcut
+        )
 
         self.fitViewMargin = QtWidgets.QDoubleSpinBox()
         self.fitViewMargin.setRange(0.0, 200.0)
@@ -372,6 +387,11 @@ class PreferencesDialog(QtWidgets.QDialog):
 
     def GetShowAllOutputPorts(self):
         return self.showAllOutputPorts.isChecked()
+
+    def GetShowNodeGraphShortcut(self):
+        return self.showNodeGraphShortcut.keySequence().toString(
+            QtGui.QKeySequence.PortableText
+        )
 
     def Run(self):
         if PySideModule == "PySide6":

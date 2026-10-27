@@ -25,7 +25,10 @@ from pxr.Usdviewq.qt import QtCore, QtGui, QtWidgets
 from pxr.Usdviewq.settings import StateSource
 
 from .compat import mtlxSupported
-from .constants import DEFAULT_FIT_VIEW_MARGIN
+from .constants import (
+    DEFAULT_FIT_VIEW_MARGIN,
+    DEFAULT_SHOW_NODE_GRAPH_SHORTCUT,
+)
 from .dialogs import BakeMtlxDialog, PreferencesDialog
 from .graph import GraphWidget
 
@@ -33,6 +36,8 @@ from .graph import GraphWidget
 class GraphDockWidget(QtWidgets.QDockWidget):
     DOCK_OBJECT_NAME = "usdshadeviewDock"
     DEFAULT_TITLE = "UsdShade Node Graph"
+
+    showNodeGraphShortcutChanged = QtCore.Signal(str)
 
     def ShowBakeMtlxDialog(self):
         material = UsdShade.Material(self.nodeGraph)
@@ -58,12 +63,14 @@ class GraphDockWidget(QtWidgets.QDockWidget):
             self.graphWidget.GetFitViewMargin(),
             self.graphWidget.GetHideScrollbars(),
             self.graphWidget.GetShowAllOutputPorts(),
+            self.showNodeGraphShortcut,
         )
         if dialog.Run() != QtWidgets.QDialog.Accepted:
             return
 
         self.graphWidget.SetFitViewMargin(dialog.GetFitViewMargin())
         self.graphWidget.SetHideScrollbars(dialog.GetHideScrollbars())
+        self.SetShowNodeGraphShortcut(dialog.GetShowNodeGraphShortcut())
 
         showAllOutputPorts = dialog.GetShowAllOutputPorts()
         if showAllOutputPorts == self.graphWidget.GetShowAllOutputPorts():
@@ -72,6 +79,15 @@ class GraphDockWidget(QtWidgets.QDockWidget):
         self.graphWidget.SetShowAllOutputPorts(showAllOutputPorts)
         if self.nodeGraph is not None:
             self.UpdateContentForOutput()
+
+    def GetShowNodeGraphShortcut(self):
+        return self.showNodeGraphShortcut
+
+    def SetShowNodeGraphShortcut(self, shortcut):
+        if shortcut == self.showNodeGraphShortcut:
+            return
+        self.showNodeGraphShortcut = shortcut
+        self.showNodeGraphShortcutChanged.emit(shortcut)
 
     def AddViewAction(self, menu, text, shortcut, callback):
         action = menu.addAction(text)
@@ -229,6 +245,7 @@ class GraphDockWidget(QtWidgets.QDockWidget):
         self.nodeGraph = None
         self.historyStack = []  # push (ng, output) when we traverse into child NG
         self.frameRequestId = 0
+        self.showNodeGraphShortcut = DEFAULT_SHOW_NODE_GRAPH_SHORTCUT
 
         self.resize(800, 600)  # set default size
 
@@ -270,6 +287,10 @@ class UsdShadeViewDockState(StateSource):
         self.showAllOutputPorts = self.stateProperty(
             "showAllOutputPorts", default=False
         )
+        self.showNodeGraphShortcut = self.stateProperty(
+            "showNodeGraphShortcut",
+            default=DEFAULT_SHOW_NODE_GRAPH_SHORTCUT,
+        )
 
     def Restore(self):
         # Show a restored floating dock without activating it: otherwise its
@@ -291,6 +312,9 @@ class UsdShadeViewDockState(StateSource):
             self._dockWidget.graphWidget.SetShowAllOutputPorts(
                 self.showAllOutputPorts
             )
+            self._dockWidget.SetShowNodeGraphShortcut(
+                self.showNodeGraphShortcut
+            )
             self._dockWidget.setVisible(self.dockVisible)
         finally:
             self._dockWidget.setAttribute(
@@ -307,3 +331,6 @@ class UsdShadeViewDockState(StateSource):
         state["fitViewMargin"] = graphWidget.GetFitViewMargin()
         state["hideScrollbars"] = graphWidget.GetHideScrollbars()
         state["showAllOutputPorts"] = graphWidget.GetShowAllOutputPorts()
+        state["showNodeGraphShortcut"] = (
+            self._dockWidget.GetShowNodeGraphShortcut()
+        )
