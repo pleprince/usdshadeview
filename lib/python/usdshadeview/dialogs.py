@@ -320,6 +320,7 @@ class PreferencesDialog(QtWidgets.QDialog):
         self,
         parent,
         fitViewMargin,
+        nodeVerticalSpacing,
         hideScrollbars,
         showAllOutputPorts,
         showNodeGraphShortcut,
@@ -351,6 +352,17 @@ class PreferencesDialog(QtWidgets.QDialog):
         )
         formLayout.addRow("Fit view margin:", self.fitViewMargin)
 
+        self.nodeVerticalSpacing = QtWidgets.QDoubleSpinBox()
+        self.nodeVerticalSpacing.setRange(0.0, 200.0)
+        self.nodeVerticalSpacing.setDecimals(1)
+        self.nodeVerticalSpacing.setSingleStep(1.0)
+        self.nodeVerticalSpacing.setValue(nodeVerticalSpacing)
+        self.nodeVerticalSpacing.setSuffix(" px")
+        self.nodeVerticalSpacing.setToolTip(
+            "Vertical gap between the nodes in each graph column."
+        )
+        formLayout.addRow("Node vertical spacing:", self.nodeVerticalSpacing)
+
         self.hideScrollbars = QtWidgets.QCheckBox("Hide scrollbars")
         self.hideScrollbars.setChecked(hideScrollbars)
         self.hideScrollbars.setToolTip(
@@ -381,6 +393,9 @@ class PreferencesDialog(QtWidgets.QDialog):
 
     def GetFitViewMargin(self):
         return self.fitViewMargin.value()
+
+    def GetNodeVerticalSpacing(self):
+        return self.nodeVerticalSpacing.value()
 
     def GetHideScrollbars(self):
         return self.hideScrollbars.isChecked()

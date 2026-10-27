@@ -25,6 +25,7 @@ from .compat import PySideModule, enableHwAcceleration
 from .connections import SplineConnectionWidget
 from .constants import (
     DEFAULT_FIT_VIEW_MARGIN,
+    DEFAULT_NODE_VERTICAL_SPACING,
     MAX_NODE_GRAPH_DEPTH,
     SPLINE_COLOR,
     UIColors,
@@ -215,6 +216,7 @@ class GraphWidget(QtWidgets.QWidget):
         self.scene = None
         self.graphRoot = None
         self.showAllOutputPorts = False
+        self.nodeVerticalSpacing = DEFAULT_NODE_VERTICAL_SPACING
         self.portMarkers = []
         self.portMarkerNodeMap = {}
         self.portMarkerUpdatePending = False
@@ -347,6 +349,7 @@ class GraphWidget(QtWidgets.QWidget):
             for _ in range(maxDepth)
         ]
         for column in columns:
+            column.setSpacing(self.nodeVerticalSpacing)
             column.addStretch()
 
         def AddNodeToColumn(node, columnIndex):
@@ -586,6 +589,12 @@ class GraphWidget(QtWidgets.QWidget):
 
     def SetShowAllOutputPorts(self, show):
         self.showAllOutputPorts = bool(show)
+
+    def GetNodeVerticalSpacing(self):
+        return self.nodeVerticalSpacing
+
+    def SetNodeVerticalSpacing(self, spacing):
+        self.nodeVerticalSpacing = max(0.0, float(spacing))
 
     def FrameNodes(self, nodes):
         if self.scene is None:

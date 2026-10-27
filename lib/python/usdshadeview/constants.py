@@ -24,6 +24,9 @@ MAX_NODE_GRAPH_DEPTH = 80
 # Fit view margin, in viewport pixels.
 DEFAULT_FIT_VIEW_MARGIN = 20.0
 
+# Vertical spacing between nodes in a graph column, in scene units.
+DEFAULT_NODE_VERTICAL_SPACING = 6
+
 # Keyboard shortcut for the "Show Node Graph" context menu action.
 DEFAULT_SHOW_NODE_GRAPH_SHORTCUT = "Ctrl+M"
 
