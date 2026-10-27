@@ -36,10 +36,10 @@ class ConnectionWidget:
         self.UpdateGeometry()
 
     def UpdateGeometry(self):
-        outputPos = self.startNode.widget().GetPortPosition(
+        outputPos = self.startNode.GetPortPosition(
             self.outputName, PortType.OUTPUT
         )
-        inputPos = self.endNode.widget().GetPortPosition(
+        inputPos = self.endNode.GetPortPosition(
             self.inputName, PortType.INPUT
         )
 

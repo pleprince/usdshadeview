@@ -208,14 +208,15 @@ class GraphWidget(QtWidgets.QWidget):
 
         self.ngChangeCallback = ngChangeCallback
 
-        self.selectedProxies = []
+        self.selectedNodes = []
         self.nodeFilterTargets = {}
-        self.widgetMap = {}
-        self.parentNgWidgetMap = {}
+        self.primNodeMap = {}
+        self.parentNgNodeMap = {}
         self.scene = None
+        self.graphRoot = None
         self.showAllOutputPorts = False
         self.portMarkers = []
-        self.portMarkerProxyMap = {}
+        self.portMarkerNodeMap = {}
         self.portMarkerUpdatePending = False
 
         self.graphView = GraphView()
@@ -348,23 +349,21 @@ class GraphWidget(QtWidgets.QWidget):
         for column in columns:
             column.addStretch()
 
-        def AddProxyWidgetToColumn(widget, columnIndex):
-            proxy = QtWidgets.QGraphicsProxyWidget()
-            proxy.setWidget(widget)
-            proxy.setZValue(1)  # Render nodes on top of lines
-            columns[columnIndex].addItem(proxy)
-            self.CreatePortMarkers(proxy, widget)
-            return proxy
+        def AddNodeToColumn(node, columnIndex):
+            node.setZValue(1)  # Render nodes on top of lines
+            columns[columnIndex].addItem(node)
+            self.CreatePortMarkers(node)
+            return node
 
         # Insert the node representing the parent node graph inputs
         for ngPrim, (depth, inputNames) in self.parentNgInputMap.items():
             nodeGraph = UsdShade.NodeGraph(ngPrim)
             ngInputs = [nodeGraph.GetInput(name) for name in inputNames]
-            w = MakeNgInputNode(nodeGraph, ngInputs)
+            node = MakeNgInputNode(nodeGraph, ngInputs)
 
             columnIndex = maxDepth - depth - 1
-            self.parentNgWidgetMap[ngPrim] = AddProxyWidgetToColumn(
-                w, columnIndex
+            self.parentNgNodeMap[ngPrim] = AddNodeToColumn(
+                node, columnIndex
             )
 
         # Insert all previously traversed nodes
@@ -372,15 +371,15 @@ class GraphWidget(QtWidgets.QWidget):
             if prim == directParentPrim:
                 nodeGraph = UsdShade.NodeGraph(prim)
                 outputs = nodeGraph.GetOutputs()
-                w = MakeNgOutputNode(prim, outputs)
+                node = MakeNgOutputNode(prim, outputs)
             else:
-                w = MakeSdrShaderNode(
+                node = MakeSdrShaderNode(
                     prim, self.ngChangeCallback, self.showAllOutputPorts
                 )
 
             columnIndex = maxDepth - depth - 1
 
-            self.widgetMap[prim] = AddProxyWidgetToColumn(w, columnIndex)
+            self.primNodeMap[prim] = AddNodeToColumn(node, columnIndex)
 
         for i in range(0, maxDepth):
             column = columns[i]
@@ -414,13 +413,13 @@ class GraphWidget(QtWidgets.QWidget):
             if not upstreamPrim:
                 continue
 
-            if upstreamPrim in self.parentNgWidgetMap:
-                startNode = self.parentNgWidgetMap[upstreamPrim]
+            if upstreamPrim in self.parentNgNodeMap:
+                startNode = self.parentNgNodeMap[upstreamPrim]
             else:
-                startNode = self.widgetMap[upstreamPrim]
+                startNode = self.primNodeMap[upstreamPrim]
 
             outputPortName = source[1]
-            endNode = self.widgetMap[prim]
+            endNode = self.primNodeMap[prim]
             inputPortName = port.GetBaseName()
 
             line = SplineConnectionWidget(
@@ -429,7 +428,7 @@ class GraphWidget(QtWidgets.QWidget):
             self.scene.addItem(line)
 
             # We stop traversal when we encounter a parent node graph
-            if upstreamPrim in self.parentNgWidgetMap:
+            if upstreamPrim in self.parentNgNodeMap:
                 continue
 
             upstreamInputs = self.GetShadePrimInputs(upstreamPrim)
@@ -443,7 +442,7 @@ class GraphWidget(QtWidgets.QWidget):
         self.nodeGraph = nodeGraph
         self.scene = QtWidgets.QGraphicsScene(self)
         self.portMarkers = []
-        self.portMarkerProxyMap = {}
+        self.portMarkerNodeMap = {}
 
         rootPrim = nodeGraph.GetPrim()
         rootInputs = (
@@ -471,35 +470,35 @@ class GraphWidget(QtWidgets.QWidget):
         self.maxDepth = 0
         self.nodeMap = {}  # [prim, depth]
         self.parentNgInputMap = {}  # used parent node graph inputs
-        self.parentNgWidgetMap = {}  # [prim, node widget]
+        self.parentNgNodeMap = {}  # [prim, node]
         self.BuildNodeMap(rootPrim, rootInputs, 0)
 
-        self.widgetMap = {}  # [prim, node widget]
+        self.primNodeMap = {}  # [prim, node]
         self.AddNodesToLayout()
 
         self.nodeMap = {}
         self.AddNodeConnections(rootPrim, rootInputs, 0)
 
-        graphWidget = QtWidgets.QGraphicsWidget()
-        graphWidget.setLayout(self.graphLayout)
-        self.scene.addItem(graphWidget)
+        self.graphRoot = QtWidgets.QGraphicsWidget()
+        self.graphRoot.setLayout(self.graphLayout)
+        self.scene.addItem(self.graphRoot)
 
         self.SchedulePortMarkerUpdate()
         self.graphView.setScene(self.scene)
         self.UpdateNodeFilterTargets()
 
-    def CreatePortMarkers(self, proxy, widget):
-        for portType, name in widget.GetPortDescriptors():
+    def CreatePortMarkers(self, node):
+        for portType, name in node.GetPortDescriptors():
             marker = QtWidgets.QGraphicsPolygonItem()
             marker.setPen(QtGui.QPen(QtCore.Qt.NoPen))
             marker.setBrush(QtGui.QColor(SPLINE_COLOR))
             marker.setAcceptedMouseButtons(QtCore.Qt.NoButton)
             marker.setZValue(2)
             self.scene.addItem(marker)
-            self.portMarkers.append((proxy, widget, portType, name, marker))
-            self.portMarkerProxyMap[marker] = proxy
+            self.portMarkers.append((node, portType, name, marker))
+            self.portMarkerNodeMap[marker] = node
 
-        proxy.geometryChanged.connect(self.SchedulePortMarkerUpdate)
+        node.geometryChanged.connect(self.SchedulePortMarkerUpdate)
 
     def SchedulePortMarkerUpdate(self):
         if self.portMarkerUpdatePending:
@@ -513,10 +512,10 @@ class GraphWidget(QtWidgets.QWidget):
         self.UpdatePortMarkers()
 
     def UpdatePortMarkers(self):
-        for proxy, widget, portType, name, marker in self.portMarkers:
-            size = widget.PORT_TRIANGLE_SIZE
+        for node, portType, name, marker in self.portMarkers:
+            size = node.PORT_TRIANGLE_SIZE
             half = size / 2.0
-            position = proxy.mapToScene(widget.GetPortPosition(name, portType))
+            position = node.mapToScene(node.GetPortPosition(name, portType))
             x = position.x() - half
             marker.setPolygon(
                 QtGui.QPolygonF(
@@ -528,47 +527,41 @@ class GraphWidget(QtWidgets.QWidget):
                 )
             )
 
-    def GetAllNodeProxies(self):
-        return list(self.widgetMap.values()) + list(
-            self.parentNgWidgetMap.values()
+    def GetAllNodes(self):
+        return list(self.primNodeMap.values()) + list(
+            self.parentNgNodeMap.values()
         )
 
     def UpdateNodeFilterTargets(self):
-        for proxy in self.GetAllNodeProxies():
-            node = proxy.widget()
-            if node is None:
-                continue
-
-            self.nodeFilterTargets[node] = proxy
-            for child in node.findChildren(QtWidgets.QWidget):
-                self.nodeFilterTargets[child] = proxy
+        for node in self.GetAllNodes():
+            self.nodeFilterTargets[node.body] = node
+            for child in node.body.findChildren(QtWidgets.QWidget):
+                self.nodeFilterTargets[child] = node
 
     def UpdateSelectionStyles(self):
-        for proxy in self.GetAllNodeProxies():
-            node = proxy.widget()
-            if isinstance(node, GraphNode):
-                node.SetSelected(proxy in self.selectedProxies)
+        for node in self.GetAllNodes():
+            node.SetSelected(node in self.selectedNodes)
 
     def ClearSelection(self):
-        if self.selectedProxies:
-            self.selectedProxies = []
+        if self.selectedNodes:
+            self.selectedNodes = []
             self.UpdateSelectionStyles()
 
-    def SelectNode(self, proxy, modifiers):
+    def SelectNode(self, node, modifiers):
         if not (modifiers & QtCore.Qt.ShiftModifier):
-            self.selectedProxies = [proxy]
-        elif proxy in self.selectedProxies:
-            self.selectedProxies.remove(proxy)
+            self.selectedNodes = [node]
+        elif node in self.selectedNodes:
+            self.selectedNodes.remove(node)
         else:
-            self.selectedProxies.append(proxy)
+            self.selectedNodes.append(node)
 
         self.UpdateSelectionStyles()
 
     def FrameSelected(self):
-        self.FrameNodes(self.selectedProxies)
+        self.FrameNodes(self.selectedNodes)
 
     def FrameAll(self):
-        self.FrameNodes(self.GetAllNodeProxies())
+        self.FrameNodes(self.GetAllNodes())
 
     def ZoomIn(self):
         self.graphView.ZoomIn()
@@ -594,13 +587,18 @@ class GraphWidget(QtWidgets.QWidget):
     def SetShowAllOutputPorts(self, show):
         self.showAllOutputPorts = bool(show)
 
-    def FrameNodes(self, proxies):
+    def FrameNodes(self, nodes):
         if self.scene is None:
             return
 
-        proxies = [p for p in proxies if p.scene() is self.scene]
-        if proxies:
-            self.graphView.FrameItems(proxies)
+        nodes = [n for n in nodes if n.scene() is self.scene]
+        if nodes:
+            self.graphView.FrameItems(nodes)
+
+    def GetNodeForItem(self, item):
+        while item is not None and not isinstance(item, GraphNode):
+            item = item.parentItem()
+        return item
 
     def IsFrameKey(self, event):
         return event.key() in (
@@ -680,11 +678,11 @@ class GraphWidget(QtWidgets.QWidget):
                 and obj is self.graphView.viewport()
             ):
                 item = self.graphView.itemAt(event.pos())
-                proxy = self.portMarkerProxyMap.get(item)
-                if proxy is None and item in self.GetAllNodeProxies():
-                    proxy = item
-                if proxy is not None:
-                    self.SelectNode(proxy, event.modifiers())
+                node = self.portMarkerNodeMap.get(item)
+                if node is None:
+                    node = self.GetNodeForItem(item)
+                if node is not None:
+                    self.SelectNode(node, event.modifiers())
                 else:
                     self.ClearSelection()
 

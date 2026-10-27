@@ -17,13 +17,12 @@
 """Node widgets and their factory functions."""
 
 from pxr import Sdr, Usd, UsdShade
-from pxr.Usdviewq.qt import QtCore, QtGui, QtWidgets
+from pxr.Usdviewq.qt import QtCore, QtWidgets
 
 from .constants import (
     AUX_BUTTON_STYLE,
     BORDER_WIDGET_STYLE,
     SELECTED_NODE_STYLE,
-    SPLINE_COLOR,
     NodeColors,
     NodeType,
     PortType,
@@ -33,26 +32,50 @@ from .utils import GetShaderNodeType, IsDefaultOutputPortName
 from .value_widgets import MakePortWidget, MakePropertyWidget
 
 
-class GraphNode(QtWidgets.QFrame):
+class GraphNode(QtWidgets.QGraphicsWidget):
     def __init__(self):
         super().__init__()
 
         self.selected = False
 
+        self.setContentsMargins(0, 0, 0, 0)
+
+        self.body = QtWidgets.QFrame()
+        self.body.setObjectName("ThisWidget")
+        self.body.setStyleSheet(BORDER_WIDGET_STYLE)
+
         nodeLayout = QtWidgets.QVBoxLayout()
         nodeLayout.setContentsMargins(0, 0, 0, 0)
         nodeLayout.setSpacing(0)
-        self.setLayout(nodeLayout)
+        self.body.setLayout(nodeLayout)
 
-        self.setStyleSheet(BORDER_WIDGET_STYLE)
-        self.setObjectName("ThisWidget")
+        self.proxy = QtWidgets.QGraphicsProxyWidget(self)
+        self.proxy.setWidget(self.body)
+        self.proxy.setPos(0, 0)
+
+    def sizeHint(self, which, constraint):
+        # The parented proxy reports its hint minus its frame margins; use the
+        # body directly to preserve the sizes the proxy had as a layout item.
+        body = getattr(self, "body", None)
+        if body is None or which == QtCore.Qt.MaximumSize:
+            return super().sizeHint(which, constraint)
+        if which == QtCore.Qt.MinimumSize:
+            return QtCore.QSizeF(body.minimumSizeHint())
+        return QtCore.QSizeF(body.sizeHint())
+
+    def setGeometry(self, rect):
+        if getattr(self, "proxy", None) is not None:
+            self.proxy.setGeometry(
+                QtCore.QRectF(QtCore.QPointF(0, 0), rect.size())
+            )
+        super().setGeometry(rect)
 
     def SetSelected(self, selected):
         if selected == self.selected:
             return
 
         self.selected = selected
-        self.setStyleSheet(
+        self.body.setStyleSheet(
             SELECTED_NODE_STYLE if selected else BORDER_WIDGET_STYLE
         )
 
@@ -88,7 +111,7 @@ class GraphNode(QtWidgets.QFrame):
             f"QFrame {{ background-color: {color.value}; color: #000; }}"
         )
 
-        self.layout().addWidget(headerFrame)
+        self.body.layout().addWidget(headerFrame)
 
 
 class ShaderNode(GraphNode):
@@ -176,7 +199,7 @@ class ShaderNode(GraphNode):
 
         # Avoid whitespace because of paddding and margin when no input exists
         if portLayout.count():
-            layout = self.layout()
+            layout = self.body.layout()
             layout.addLayout(portLayout)
 
     def AuxButtonPressed(self):
@@ -189,18 +212,18 @@ class ShaderNode(GraphNode):
             OpenNodeDefDialog(ndId)
 
     def GetPortPosition(self, name, portType):
-        x = 0 if portType == PortType.INPUT else self.width()
+        x = 0 if portType == PortType.INPUT else self.size().width()
 
         if portType == PortType.INPUT:
             w = self.inputPortWidgets[name]
             p = w.rect().center()
-            y = w.mapTo(self, p).y()
+            y = w.mapTo(self.body, p).y()
         elif name in self.outputPortWidgets:
             w = self.outputPortWidgets[name]
             p = w.rect().center()
-            y = w.mapTo(self, p).y()
+            y = w.mapTo(self.body, p).y()
         else:
-            y = self.height() / 2
+            y = self.size().height() / 2
 
         return QtCore.QPointF(x, y)
 
