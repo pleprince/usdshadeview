@@ -26,6 +26,26 @@ from .compat import PySideModule, UsdBakeMtlx
 from .constants import GraphColors, NodeType
 
 
+def execDialog(dialog):
+    """Runs a dialog modally, hiding the PySide5/PySide6 naming difference."""
+    if PySideModule == "PySide6":
+        return dialog.exec()
+    return dialog.exec_()
+
+
+def RunAndDelete(dialog):
+    """Runs a dialog modally and disposes of it afterwards."""
+    try:
+        return execDialog(dialog)
+    finally:
+        dialog.deleteLater()
+
+
+def isDialogAccepted(dialog):
+    """Returns whether a modal dialog was accepted by the user."""
+    return execDialog(dialog) == QtWidgets.QDialog.Accepted
+
+
 class BakeMtlxDialog(QtWidgets.QDialog):
     def __init__(self, material, parent=None):
         super().__init__(parent)
@@ -337,6 +357,8 @@ NODE_COLOR_LABELS = [
 class ColorButton(QtWidgets.QPushButton):
     """A button showing a color swatch and opening a color picker."""
 
+    colorChanged = QtCore.Signal(str)
+
     def __init__(self, color, parent=None):
         super().__init__(parent)
         self.color = QtGui.QColor(color)
@@ -351,6 +373,7 @@ class ColorButton(QtWidgets.QPushButton):
     def SetColor(self, color):
         self.color = QtGui.QColor(color)
         self.UpdateSwatch()
+        self.colorChanged.emit(self.GetColor())
 
     def UpdateSwatch(self):
         color = self.color
@@ -436,23 +459,31 @@ class PreferencesDialog(QtWidgets.QDialog):
         colorsGroup = QtWidgets.QGroupBox("Colors")
         colorsLayout = QtWidgets.QFormLayout(colorsGroup)
 
+        # Draft the colors in one object: every edit updates it in place,
+        # so accepting is just re-reading it.
+        self.colors = GraphColors.FromDict(colors.ToDict())
+        self.colorButtons = {}
+
         self.nodeColorButtons = {}
         for nodeType, label in NODE_COLOR_LABELS:
-            button = ColorButton(colors.GetNodeColor(nodeType))
+            button = self.AddColorRow(
+                colorsLayout, label, self.colors.GetNodeColor(nodeType)
+            )
+            button.colorChanged.connect(
+                lambda color, key=nodeType.name: self.SetNodeColor(key, color)
+            )
             self.nodeColorButtons[nodeType.name] = button
-            colorsLayout.addRow(label, button)
 
-        self.nodeBackgroundColor = ColorButton(colors.nodeBackgroundColor)
-        colorsLayout.addRow("Node background color:", self.nodeBackgroundColor)
-
-        self.connectionColor = ColorButton(colors.connectionColor)
-        colorsLayout.addRow("Connection color:", self.connectionColor)
-
-        self.backgroundColor = ColorButton(colors.backgroundColor)
-        colorsLayout.addRow("Background color:", self.backgroundColor)
-
-        self.gridColor = ColorButton(colors.gridColor)
-        colorsLayout.addRow("Background grid color:", self.gridColor)
+        self.AddColorField(
+            colorsLayout, "nodeBackgroundColor", "Node background color:"
+        )
+        self.AddColorField(
+            colorsLayout, "connectionColor", "Connection color:"
+        )
+        self.AddColorField(
+            colorsLayout, "backgroundColor", "Background color:"
+        )
+        self.AddColorField(colorsLayout, "gridColor", "Background grid color:")
 
         layout = QtWidgets.QVBoxLayout()
         layout.addLayout(formLayout)
@@ -470,6 +501,25 @@ class PreferencesDialog(QtWidgets.QDialog):
         self.setLayout(layout)
         self.setFixedWidth(self.sizeHint().width() * 1.5)
 
+    def AddColorRow(self, formLayout, label, color):
+        """Adds a color row to the form and returns its button."""
+        button = ColorButton(color)
+        formLayout.addRow(label, button)
+        return button
+
+    def AddColorField(self, formLayout, fieldName, label):
+        """Adds a color row bound to a top-level GraphColors field."""
+        button = self.AddColorRow(
+            formLayout, label, getattr(self.colors, fieldName)
+        )
+        button.colorChanged.connect(
+            lambda color: setattr(self.colors, fieldName, color)
+        )
+        self.colorButtons[fieldName] = button
+
+    def SetNodeColor(self, nodeTypeName, color):
+        self.colors.nodeColors[nodeTypeName] = color
+
     def GetFitViewMargin(self):
         return self.fitViewMargin.value()
 
@@ -477,16 +527,7 @@ class PreferencesDialog(QtWidgets.QDialog):
         return self.nodeVerticalSpacing.value()
 
     def GetColors(self):
-        return GraphColors(
-            nodeColors={
-                key: button.GetColor()
-                for key, button in self.nodeColorButtons.items()
-            },
-            connectionColor=self.connectionColor.GetColor(),
-            backgroundColor=self.backgroundColor.GetColor(),
-            gridColor=self.gridColor.GetColor(),
-            nodeBackgroundColor=self.nodeBackgroundColor.GetColor(),
-        )
+        return GraphColors.FromDict(self.colors.ToDict())
 
     def GetHideScrollbars(self):
         return self.hideScrollbars.isChecked()
@@ -498,11 +539,6 @@ class PreferencesDialog(QtWidgets.QDialog):
         return self.showNodeGraphShortcut.keySequence().toString(
             QtGui.QKeySequence.PortableText
         )
-
-    def Run(self):
-        if PySideModule == "PySide6":
-            return self.exec()
-        return self.exec_()
 
 
 class ValueArrayDialog(QtWidgets.QDialog):
@@ -528,11 +564,4 @@ class ValueArrayDialog(QtWidgets.QDialog):
 
 
 def ShowValueArrayDialog(value, parent=None):
-    d = ValueArrayDialog(value, parent)
-    try:
-        if PySideModule == "PySide6":
-            d.exec()
-        else:
-            d.exec_()
-    finally:
-        d.deleteLater()
+    RunAndDelete(ValueArrayDialog(value, parent))

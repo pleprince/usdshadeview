@@ -17,8 +17,8 @@
 """Widgets that render USD attribute values."""
 
 import base64
+import logging
 import os
-import sys
 
 from pxr import Ar, Gf, Sdf, Usd, UsdShade
 from pxr.Usdviewq.qt import QtCore, QtGui, QtWidgets
@@ -40,6 +40,8 @@ from .utils import (
     OpenFileInFolderWithSystem,
     OpenFileWithSystem,
 )
+
+logger = logging.getLogger(__name__)
 
 
 # Sets up a context menu on a value widget
@@ -426,7 +428,7 @@ def MakeValueStr(value, typeName):
     elif typeName == Sdf.ValueTypeNames.Opaque:
         return "???"
     else:
-        print(f"WARNING: unhandled type {str(typeName)}", file=sys.stderr)
+        logger.warning("Unhandled value type %s", typeName)
         return ToString(value)
 
 

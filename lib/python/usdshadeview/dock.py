@@ -17,8 +17,8 @@
 """The usdview dock widget and its persisted state."""
 
 import base64
+import logging
 import platform
-import sys
 
 from pxr import UsdShade
 from pxr.Usdviewq.qt import QtCore, QtGui, QtWidgets
@@ -31,8 +31,14 @@ from .constants import (
     DEFAULT_SHOW_NODE_GRAPH_SHORTCUT,
     GraphColors,
 )
-from .dialogs import BakeMtlxDialog, PreferencesDialog
+from .dialogs import (
+    BakeMtlxDialog,
+    PreferencesDialog,
+    isDialogAccepted,
+)
 from .graph import GraphWidget
+
+logger = logging.getLogger(__name__)
 
 
 class GraphDockWidget(QtWidgets.QDockWidget):
@@ -75,10 +81,11 @@ class GraphDockWidget(QtWidgets.QDockWidget):
             self.showNodeGraphShortcut,
             graphWidget.GetColors(),
         )
-        try:
-            if dialog.Run() != QtWidgets.QDialog.Accepted:
-                return
+        if not isDialogAccepted(dialog):
+            dialog.deleteLater()
+            return
 
+        try:
             graphView.SetFitViewMargin(dialog.GetFitViewMargin())
             graphView.SetHideScrollbars(dialog.GetHideScrollbars())
             self.SetShowNodeGraphShortcut(dialog.GetShowNodeGraphShortcut())
@@ -196,13 +203,19 @@ class GraphDockWidget(QtWidgets.QDockWidget):
 
     def BackToParentNodeGraph(self):
         self.nodeGraph, self.selectedOutput = self.historyStack.pop()
-        self.UpdateContentForOutput()
+        self.RefreshContent()
 
     def SwitchToOutput(self, output):
         if output == self.selectedOutput:
             return  # Already showing, don't reset viewport
         self.selectedOutput = output
-        self.UpdateContentForOutput()
+        self.RefreshContent()
+
+    def RefreshContent(self):
+        """Rebuilds the scene and frames it once the view is laid out."""
+        # Frame once the pending layout/resize has been processed, so that
+        # the viewport size used for framing is already the final one.
+        QtCore.QTimer.singleShot(0, self.graphWidget.FrameAll)
 
     def UpdateContentForOutput(self):
         primPath = str(self.nodeGraph.GetPrim().GetPath())
@@ -215,7 +228,7 @@ class GraphDockWidget(QtWidgets.QDockWidget):
         self.graphWidget.PopulateScene(self.nodeGraph, self.selectedOutput)
 
         self.UpdateMenuBar()
-        self.ScheduleFrameAll()
+        self.RefreshContent()
 
     def GetDefaultOutput(self):
         # For materials, we try to select the 'surface' output. For NGs, none.
@@ -232,8 +245,14 @@ class GraphDockWidget(QtWidgets.QDockWidget):
         )
 
     def SetNodeGraph(self, nodeGraph):
+        """Shows ``nodeGraph``, keeping the current one for Back actions."""
+        # QTimer.singleShot(0, ...) drops pending frames, so re-entering the
+        # same graph is already coalesced by this early return.
+        if nodeGraph == self.nodeGraph:
+            return
+
         # Store old NGs on a stack so that we can navigate back using the menu
-        if self.nodeGraph is not None and nodeGraph != self.nodeGraph:
+        if self.nodeGraph is not None:
             self.historyStack.append((self.nodeGraph, self.selectedOutput))
 
         self.nodeGraph = nodeGraph
@@ -243,17 +262,6 @@ class GraphDockWidget(QtWidgets.QDockWidget):
         self.graphWidget.show()
 
         self.UpdateContentForOutput()
-
-    def ScheduleFrameAll(self):
-        self.frameRequestId += 1
-        requestId = self.frameRequestId
-        QtCore.QTimer.singleShot(0, lambda: self.FrameAllOnIdle(requestId))
-
-    def FrameAllOnIdle(self, requestId):
-        if requestId != self.frameRequestId:
-            return
-
-        self.graphWidget.FrameAll()
 
     def __init__(self, mainWindow):
         super().__init__(self.DEFAULT_TITLE, mainWindow)
@@ -285,14 +293,12 @@ class GraphDockWidget(QtWidgets.QDockWidget):
 
         self.nodeGraph = None
         self.historyStack = []  # push (ng, output) when we traverse into child NG
-        self.frameRequestId = 0
         self.showNodeGraphShortcut = DEFAULT_SHOW_NODE_GRAPH_SHORTCUT
 
         self.resize(800, 600)  # set default size
 
     def ShowNodeGraph(self, nodeGraph):
-        if nodeGraph != self.nodeGraph:
-            self.SetNodeGraph(nodeGraph)
+        self.SetNodeGraph(nodeGraph)
         self.show()
         self.raise_()
 
@@ -358,10 +364,7 @@ class UsdShadeViewDockState(StateSource):
                     self.dockState.encode("ascii")
                 )
                 if not self._mainWindow.restoreState(state):
-                    print(
-                        "WARNING: failed to restore usdshadeview dock state",
-                        file=sys.stderr,
-                    )
+                    logger.warning("Failed to restore usdshadeview dock state")
 
             graphView.SetFitViewMargin(self.fitViewMargin)
             graphWidget.SetNodeVerticalSpacing(self.nodeVerticalSpacing)

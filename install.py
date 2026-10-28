@@ -138,10 +138,9 @@ def _find_pxr_under(usd_root: str) -> Optional[str]:
         return candidates.pop()
 
     raise RuntimeError(
-        "Found multiple 'pxr' packages under {}: {}. Remove the unused "
-        "ones or run the installer with the matching interpreter.".format(
-            usd_root, ", ".join(sorted(candidates))
-        )
+        f"Found multiple 'pxr' packages under {usd_root}: "
+        f"{', '.join(sorted(candidates))}. Remove the unused ones or run "
+        "the installer with the matching interpreter."
     )
 
 
@@ -184,16 +183,12 @@ def resolve_layout(usd_root: Optional[str]) -> tuple[str, str]:
     if usd_root is not None:
         usd_root = os.path.abspath(usd_root)
         if not os.path.isdir(usd_root):
-            raise RuntimeError(
-                "USD root does not exist: {}".format(usd_root)
-            )
+            raise RuntimeError(f"USD root does not exist: {usd_root}")
         pxr_dir = _find_pxr_under(usd_root)
         if pxr_dir is None:
             raise RuntimeError(
-                "Could not find a 'pxr' package under {}. Pass "
-                "--usd-root pointing at a USD installation.".format(
-                    usd_root
-                )
+                f"Could not find a 'pxr' package under {usd_root}. Pass "
+                "--usd-root pointing at a USD installation."
             )
         return (
             os.path.dirname(pxr_dir),
@@ -204,8 +199,8 @@ def resolve_layout(usd_root: Optional[str]) -> tuple[str, str]:
     plugin_dir = _find_plugin_dir(python_dir)
     if plugin_dir is None:
         raise RuntimeError(
-            "Could not locate a USD 'plugin/usd' directory above {}. "
-            "Pass --usd-root.".format(python_dir)
+            f"Could not locate a USD 'plugin/usd' directory above "
+            f"{python_dir}. Pass --usd-root."
         )
     return python_dir, plugin_dir
 
@@ -287,8 +282,7 @@ def _write_manifest(dest: str, files: set[str]) -> None:
     tmp_path = path + ".tmp"
     logger.debug("write manifest %s (%d entries)", path, len(files))
     with open(tmp_path, "w", encoding="utf-8", newline="\n") as manifest:
-        for rel in sorted(files):
-            manifest.write(rel + "\n")
+        manifest.writelines(rel + "\n" for rel in sorted(files))
     os.replace(tmp_path, path)
 
 
@@ -326,7 +320,7 @@ def _merge_copy(src: str, dst: str) -> None:
         dst_path = _safe_join(dst, rel)
         if dst_path is None:
             raise RuntimeError(
-                "Refusing to write outside destination: {}".format(rel)
+                f"Refusing to write outside destination: {rel}"
             )
         os.makedirs(os.path.dirname(dst_path), exist_ok=True)
         logger.debug("copy %s -> %s", src_path, dst_path)
@@ -377,12 +371,32 @@ def _remove_legacy_python_dir(layout: tuple[str, str]) -> None:
     target = os.path.join(python_dir, PACKAGE_NAME)
     if os.path.abspath(legacy) == os.path.abspath(target):
         return
-    if os.path.islink(legacy) or os.path.isfile(legacy):
+    if os.path.islink(legacy) or os.path.exists(legacy):
         logger.info("Removed legacy install %s", legacy)
-        os.remove(legacy)
-    elif os.path.isdir(legacy):
-        logger.info("Removed legacy install %s", legacy)
-        shutil.rmtree(legacy)
+        _remove_path(legacy)
+
+
+def _payload_targets(layout: tuple[str, str]) -> list[tuple[str, str]]:
+    """Return ``(source, destination)`` pairs for every payload."""
+    python_dir, plugin_dir = layout
+    roots = {"python": python_dir, "plugin": plugin_dir}
+    return [
+        (
+            os.path.join(REPO_ROOT, src_rel),
+            os.path.join(roots[kind], PACKAGE_NAME),
+        )
+        for src_rel, kind in PAYLOADS
+    ]
+
+
+def _remove_path(path: str) -> None:
+    """Remove a file, symlink or directory tree if it exists."""
+    if os.path.islink(path) or os.path.isfile(path):
+        logger.debug("remove file %s", path)
+        os.remove(path)
+    elif os.path.isdir(path):
+        logger.debug("remove directory %s", path)
+        shutil.rmtree(path)
 
 
 def install(layout: tuple[str, str]) -> None:
@@ -391,13 +405,10 @@ def install(layout: tuple[str, str]) -> None:
     Args:
         layout: ``(python_dir, plugin_dir)`` destinations.
     """
-    python_dir, plugin_dir = layout
-    targets = {"python": python_dir, "plugin": plugin_dir}
-    for src_rel, kind in PAYLOADS:
-        src = os.path.join(REPO_ROOT, src_rel)
-        dst = os.path.join(targets[kind], PACKAGE_NAME)
+    for src, dst in _payload_targets(layout):
+        src_rel = os.path.relpath(src, REPO_ROOT)
         if not os.path.isdir(src):
-            raise RuntimeError("Missing source directory: {}".format(src))
+            raise RuntimeError(f"Missing source directory: {src}")
 
         staging_root, staged = _stage_payload(src, dst)
         try:
@@ -405,7 +416,7 @@ def install(layout: tuple[str, str]) -> None:
                 os.path.exists(dst) and not os.path.isdir(dst)
             ):
                 logger.debug("remove non-directory destination %s", dst)
-                os.remove(dst)
+                _remove_path(dst)
 
             new_files = _collect_files(staged)
             old_files = _read_manifest(dst)
@@ -441,17 +452,9 @@ def uninstall(layout: tuple[str, str]) -> None:
     Args:
         layout: ``(python_dir, plugin_dir)`` destinations.
     """
-    python_dir, plugin_dir = layout
-    targets = {"python": python_dir, "plugin": plugin_dir}
-    for _src_rel, kind in PAYLOADS:
-        dst = os.path.join(targets[kind], PACKAGE_NAME)
+    for _src, dst in _payload_targets(layout):
         if os.path.islink(dst) or os.path.exists(dst):
-            if os.path.islink(dst) or os.path.isfile(dst):
-                logger.debug("remove file %s", dst)
-                os.remove(dst)
-            else:
-                logger.debug("remove directory %s", dst)
-                shutil.rmtree(dst)
+            _remove_path(dst)
             logger.info("Removed %s", dst)
         else:
             logger.info("Not present, skipping %s", dst)

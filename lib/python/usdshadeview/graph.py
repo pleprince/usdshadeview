@@ -16,13 +16,13 @@
 
 """Graph scene, layout and interactive view."""
 
-import sys
+import logging
 
 from pxr import UsdShade
 from pxr.Usdviewq.qt import QGLFormat, QGLWidget, QtCore, QtGui, QtWidgets
 
 from .compat import PySideModule, enableHwAcceleration
-from .connections import SplineConnectionWidget
+from .connections import ConnectionWidget
 from .constants import (
     DEFAULT_FIT_VIEW_MARGIN,
     DEFAULT_NODE_VERTICAL_SPACING,
@@ -35,6 +35,8 @@ from .nodes import (
     MakeNgOutputNode,
     MakeSdrShaderNode,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class GraphView(QtWidgets.QGraphicsView):
@@ -272,18 +274,31 @@ class GraphWidget(QtWidgets.QWidget):
     def RenderSceneToImage(self):
         scaleFactor = 4.0  # Higher values = larger resolution = less aliasing
 
-        self.scene.clearSelection()
-        self.scene.setSceneRect(self.scene.itemsBoundingRect())
+        # Rendering must not disturb the live scene: hide the selection
+        # highlight and the viewport-driven scene rect while capturing
+        # (an empty sceneRect makes the view derive it from the items).
+        previousSceneRect = self.scene.sceneRect()
+        selectedItems = self.scene.selectedItems()
+        for item in selectedItems:
+            item.setSelected(False)
 
-        imageSize = self.scene.sceneRect().size().toSize()
-        image = QtGui.QImage(
-            imageSize * scaleFactor, QtGui.QImage.Format_ARGB32
-        )
-        image.fill(QtCore.Qt.transparent)
+        self.scene.setSceneRect(QtCore.QRectF())
+        try:
+            imageSize = self.scene.sceneRect().size().toSize()
+            image = QtGui.QImage(
+                imageSize * scaleFactor, QtGui.QImage.Format_ARGB32
+            )
+            image.fill(QtCore.Qt.transparent)
 
-        painter = QtGui.QPainter(image)
-        self.scene.render(painter)
-        painter.end()
+            painter = QtGui.QPainter(image)
+            try:
+                self.scene.render(painter)
+            finally:
+                painter.end()
+        finally:
+            self.scene.setSceneRect(previousSceneRect)
+            for item in selectedItems:
+                item.setSelected(True)
 
         return image
 
@@ -335,7 +350,7 @@ class GraphWidget(QtWidgets.QWidget):
     # Furthermore we track which inputs from the parent node graph are used, and at which depth.
     def BuildNodeMap(self, prim, ports, depth):
         if depth > MAX_NODE_GRAPH_DEPTH:
-            print("WARNING: maximum node graph depth reached", file=sys.stderr)
+            logger.warning("Maximum node graph depth reached")
             return
 
         if not self.UpdateNodeDepth(prim, depth):
@@ -449,7 +464,7 @@ class GraphWidget(QtWidgets.QWidget):
     # we traverse the network again and get the widget for each prim using the map.
     def AddNodeConnections(self, prim, ports, depth):
         if depth > MAX_NODE_GRAPH_DEPTH:
-            print("WARNING: maximum node graph depth reached", file=sys.stderr)
+            logger.warning("Maximum node graph depth reached")
             return
 
         # We reuse the nodemap from the discovery phase to skip existing connections.
@@ -477,7 +492,7 @@ class GraphWidget(QtWidgets.QWidget):
             endNode = self.primNodeMap[prim]
             inputPortName = port.GetBaseName()
 
-            line = SplineConnectionWidget(
+            line = ConnectionWidget(
                 startNode,
                 outputPortName,
                 endNode,

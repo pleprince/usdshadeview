@@ -21,11 +21,19 @@ from pxr.Usdviewq.qt import QtCore, QtGui, QtWidgets
 from .constants import SPLINE_COLOR, PortType
 
 
-class ConnectionWidget:
+class ConnectionWidget(QtWidgets.QGraphicsPathItem):
+    """A bezier spline between an upstream output and a downstream input."""
+
     def __init__(
-        self, startNode, outputName, endNode, inputName, color=SPLINE_COLOR
+        self,
+        startNode,
+        outputName,
+        endNode,
+        inputName,
+        color=SPLINE_COLOR,
     ):
         super().__init__()
+
         self.startNode = startNode
         self.endNode = endNode
         self.outputName = outputName
@@ -48,9 +56,6 @@ class ConnectionWidget:
 
         self.SetStartEndPoints(startPos, endPos)
 
-
-# Bezier spline
-class SplineConnectionWidget(ConnectionWidget, QtWidgets.QGraphicsPathItem):
     def SetStartEndPoints(self, p1, p2):
         path = QtGui.QPainterPath()
 
@@ -68,3 +73,7 @@ class SplineConnectionWidget(ConnectionWidget, QtWidgets.QGraphicsPathItem):
         path.cubicTo(controlPoint1, controlPoint2, p2)
 
         self.setPath(path)
+
+
+# Backwards-compatible alias for the former spline-only subclass.
+SplineConnectionWidget = ConnectionWidget
