@@ -148,8 +148,12 @@ class GraphDockWidget(QtWidgets.QDockWidget):
 
         viewMenu = menuBar.addMenu("View")
         if self.historyStack:
-            a = viewMenu.addAction("Back to Parent")
-            a.triggered.connect(self.BackToParentNodeGraph)
+            self.AddViewAction(
+                viewMenu,
+                "Back to Parent",
+                "B",
+                self.BackToParentNodeGraph,
+            )
             viewMenu.addSeparator()
 
         self.AddViewAction(
