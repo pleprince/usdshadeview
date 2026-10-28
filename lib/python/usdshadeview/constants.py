@@ -33,6 +33,12 @@ DEFAULT_NODE_VERTICAL_SPACING = 6
 # Keyboard shortcut for the "Show Node Graph" context menu action.
 DEFAULT_SHOW_NODE_GRAPH_SHORTCUT = "Ctrl+M"
 
+# Whether to hide the scrollbars around the node graph view.
+DEFAULT_HIDE_SCROLLBARS = False
+
+# Whether to show all output ports on nodes.
+DEFAULT_SHOW_ALL_OUTPUT_PORTS = False
+
 
 class UIColors(str, Enum):
     GOLD = "#c39a46"

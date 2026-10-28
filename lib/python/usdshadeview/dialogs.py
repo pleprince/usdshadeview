@@ -23,7 +23,15 @@ from pxr.Usdviewq.qt import QtCore, QtGui, QtWidgets
 from pxr.Usdviewq.scalarTypes import ToString
 
 from .compat import PySideModule, UsdBakeMtlx
-from .constants import GraphColors, NodeType
+from .constants import (
+    DEFAULT_FIT_VIEW_MARGIN,
+    DEFAULT_HIDE_SCROLLBARS,
+    DEFAULT_NODE_VERTICAL_SPACING,
+    DEFAULT_SHOW_ALL_OUTPUT_PORTS,
+    DEFAULT_SHOW_NODE_GRAPH_SHORTCUT,
+    GraphColors,
+    NodeType,
+)
 
 
 def execDialog(dialog):
@@ -494,12 +502,34 @@ class PreferencesDialog(QtWidgets.QDialog):
         buttonBox = QtWidgets.QDialogButtonBox(
             QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel
         )
+        resetButton = buttonBox.addButton(
+            "Reset to Defaults", QtWidgets.QDialogButtonBox.ResetRole
+        )
+        resetButton.clicked.connect(self.ResetToDefaults)
         buttonBox.accepted.connect(self.accept)
         buttonBox.rejected.connect(self.reject)
         layout.addWidget(buttonBox)
 
         self.setLayout(layout)
         self.setFixedWidth(self.sizeHint().width() * 1.5)
+
+    def ResetToDefaults(self):
+        """Restores every preference widget to its default value."""
+        self.showNodeGraphShortcut.setKeySequence(
+            QtGui.QKeySequence(DEFAULT_SHOW_NODE_GRAPH_SHORTCUT)
+        )
+        self.fitViewMargin.setValue(int(DEFAULT_FIT_VIEW_MARGIN))
+        self.nodeVerticalSpacing.setValue(DEFAULT_NODE_VERTICAL_SPACING)
+        self.hideScrollbars.setChecked(DEFAULT_HIDE_SCROLLBARS)
+        self.showAllOutputPorts.setChecked(DEFAULT_SHOW_ALL_OUTPUT_PORTS)
+
+        self.colors = GraphColors()
+        for fieldName, button in self.colorButtons.items():
+            button.SetColor(getattr(self.colors, fieldName))
+        for nodeType, _ in NODE_COLOR_LABELS:
+            self.nodeColorButtons[nodeType.name].SetColor(
+                self.colors.GetNodeColor(nodeType)
+            )
 
     def AddColorRow(self, formLayout, label, color):
         """Adds a color row to the form and returns its button."""

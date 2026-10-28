@@ -25,7 +25,9 @@ from .compat import PySideModule, enableHwAcceleration
 from .connections import ConnectionWidget
 from .constants import (
     DEFAULT_FIT_VIEW_MARGIN,
+    DEFAULT_HIDE_SCROLLBARS,
     DEFAULT_NODE_VERTICAL_SPACING,
+    DEFAULT_SHOW_ALL_OUTPUT_PORTS,
     MAX_NODE_GRAPH_DEPTH,
     GraphColors,
 )
@@ -48,7 +50,7 @@ class GraphView(QtWidgets.QGraphicsView):
         super().__init__()
 
         self.fitViewMargin = DEFAULT_FIT_VIEW_MARGIN
-        self.hideScrollbars = False
+        self.hideScrollbars = DEFAULT_HIDE_SCROLLBARS
         self.colors = GraphColors()
 
         self.setDragMode(QtWidgets.QGraphicsView.ScrollHandDrag)
@@ -227,7 +229,7 @@ class GraphWidget(QtWidgets.QWidget):
         self.parentNgNodeMap = {}
         self.scene = None
         self.graphRoot = None
-        self.showAllOutputPorts = False
+        self.showAllOutputPorts = DEFAULT_SHOW_ALL_OUTPUT_PORTS
         self.nodeVerticalSpacing = DEFAULT_NODE_VERTICAL_SPACING
         self.colors = GraphColors()
         self.portMarkers = []

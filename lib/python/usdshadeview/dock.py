@@ -27,7 +27,9 @@ from pxr.Usdviewq.settings import StateSource
 from .compat import mtlxSupported
 from .constants import (
     DEFAULT_FIT_VIEW_MARGIN,
+    DEFAULT_HIDE_SCROLLBARS,
     DEFAULT_NODE_VERTICAL_SPACING,
+    DEFAULT_SHOW_ALL_OUTPUT_PORTS,
     DEFAULT_SHOW_NODE_GRAPH_SHORTCUT,
     GraphColors,
 )
@@ -340,10 +342,10 @@ class UsdShadeViewDockState(StateSource):
             validator=lambda value: isinstance(value, dict),
         )
         self.hideScrollbars = self.stateProperty(
-            "hideScrollbars", default=False
+            "hideScrollbars", default=DEFAULT_HIDE_SCROLLBARS
         )
         self.showAllOutputPorts = self.stateProperty(
-            "showAllOutputPorts", default=False
+            "showAllOutputPorts", default=DEFAULT_SHOW_ALL_OUTPUT_PORTS
         )
         self.showNodeGraphShortcut = self.stateProperty(
             "showNodeGraphShortcut",
