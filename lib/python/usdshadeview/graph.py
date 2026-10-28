@@ -234,6 +234,7 @@ class GraphWidget(QtWidgets.QWidget):
 
         self.graphView = GraphView()
         self.graphView.SetColors(self.colors)
+        self.SetupKeyActions()
 
         layout = QtWidgets.QVBoxLayout()
         layout.addWidget(self.graphView)
@@ -242,6 +243,31 @@ class GraphWidget(QtWidgets.QWidget):
         app = QtWidgets.QApplication.instance()
         if app is not None:
             app.installEventFilter(self)
+
+    def SetupKeyActions(self):
+        noModifiers = (QtCore.Qt.NoModifier, QtCore.Qt.KeypadModifier)
+        withShift = (
+            QtCore.Qt.NoModifier,
+            QtCore.Qt.ShiftModifier,
+            QtCore.Qt.KeypadModifier,
+        )
+        self.keyActions = {
+            QtCore.Qt.Key.Key_F: (self.FrameSelected, noModifiers),
+            QtCore.Qt.Key.Key_A: (self.FrameAll, noModifiers),
+            QtCore.Qt.Key.Key_Plus: (self.graphView.ZoomIn, withShift),
+            QtCore.Qt.Key.Key_Equal: (self.graphView.ZoomIn, withShift),
+            QtCore.Qt.Key.Key_Minus: (self.graphView.ZoomOut, withShift),
+            QtCore.Qt.Key.Key_Underscore: (self.graphView.ZoomOut, withShift),
+        }
+
+    def GetKeyAction(self, event):
+        """Returns the bound action if the event's key & modifiers match."""
+        keyAction = self.keyActions.get(event.key())
+        if keyAction is None:
+            return None
+
+        action, modifiers = keyAction
+        return action if event.modifiers() in modifiers else None
 
     def RenderSceneToImage(self):
         scaleFactor = 4.0  # Higher values = larger resolution = less aliasing
@@ -596,24 +622,6 @@ class GraphWidget(QtWidgets.QWidget):
     def FrameAll(self):
         self.FrameNodes(self.GetAllNodes())
 
-    def ZoomIn(self):
-        self.graphView.ZoomIn()
-
-    def ZoomOut(self):
-        self.graphView.ZoomOut()
-
-    def GetFitViewMargin(self):
-        return self.graphView.GetFitViewMargin()
-
-    def SetFitViewMargin(self, margin):
-        self.graphView.SetFitViewMargin(margin)
-
-    def GetHideScrollbars(self):
-        return self.graphView.GetHideScrollbars()
-
-    def SetHideScrollbars(self, hide):
-        self.graphView.SetHideScrollbars(hide)
-
     def GetShowAllOutputPorts(self):
         return self.showAllOutputPorts
 
@@ -646,37 +654,16 @@ class GraphWidget(QtWidgets.QWidget):
             item = item.parentItem()
         return item
 
-    def IsFrameKey(self, event):
-        return event.key() in (
-            QtCore.Qt.Key.Key_F,
-            QtCore.Qt.Key.Key_A,
-        ) and event.modifiers() in (
-            QtCore.Qt.NoModifier,
-            QtCore.Qt.KeypadModifier,
+    def IsGraphWidget(self, widget):
+        return (
+            widget is self.graphView.viewport()
+            or widget in self.nodeFilterTargets
         )
-
-    def IsZoomKey(self, event):
-        zoomKeys = (
-            QtCore.Qt.Key.Key_Plus,
-            QtCore.Qt.Key.Key_Equal,
-            QtCore.Qt.Key.Key_Minus,
-            QtCore.Qt.Key.Key_Underscore,
-        )
-        return event.key() in zoomKeys and event.modifiers() in (
-            QtCore.Qt.NoModifier,
-            QtCore.Qt.ShiftModifier,
-            QtCore.Qt.KeypadModifier,
-        )
-
-    def IsPanelKey(self, event):
-        return self.IsFrameKey(event) or self.IsZoomKey(event)
 
     def IsKeyTarget(self, obj):
         if obj is self or obj is self.graphView:
             return True
-        if obj is self.graphView.viewport():
-            return True
-        if obj in self.nodeFilterTargets:
+        if self.IsGraphWidget(obj):
             return True
 
         return self.IsGraphUnderMouse()
@@ -686,38 +673,23 @@ class GraphWidget(QtWidgets.QWidget):
             return False
 
         widget = QtWidgets.QApplication.widgetAt(QtGui.QCursor.pos())
-        if widget is None:
-            return False
-
-        return (
-            widget is self.graphView.viewport()
-            or widget in self.nodeFilterTargets
-        )
-
-    def HandleKeyPress(self, event):
-        key = event.key()
-
-        if key == QtCore.Qt.Key.Key_F:
-            self.FrameSelected()
-        elif key == QtCore.Qt.Key.Key_A:
-            self.FrameAll()
-        elif key in (QtCore.Qt.Key.Key_Plus, QtCore.Qt.Key.Key_Equal):
-            self.ZoomIn()
-        elif key in (QtCore.Qt.Key.Key_Minus, QtCore.Qt.Key.Key_Underscore):
-            self.ZoomOut()
-
-        return True
+        return widget is not None and self.IsGraphWidget(widget)
 
     def eventFilter(self, obj, event):
         eventType = event.type()
 
-        if eventType == QtCore.QEvent.Type.ShortcutOverride:
-            if self.IsPanelKey(event) and self.IsKeyTarget(obj):
+        if eventType in (
+            QtCore.QEvent.Type.ShortcutOverride,
+            QtCore.QEvent.Type.KeyPress,
+        ):
+            action = self.GetKeyAction(event)
+            if action is None or not self.IsKeyTarget(obj):
+                return super().eventFilter(obj, event)
+            if eventType == QtCore.QEvent.Type.ShortcutOverride:
                 event.accept()
-                return True
-        elif eventType == QtCore.QEvent.Type.KeyPress:
-            if self.IsPanelKey(event) and self.IsKeyTarget(obj):
-                return self.HandleKeyPress(event)
+            else:
+                action()
+            return True
         elif eventType == QtCore.QEvent.Type.MouseButtonPress:
             if (
                 event.button() == QtCore.Qt.LeftButton

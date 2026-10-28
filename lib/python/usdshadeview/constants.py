@@ -56,32 +56,19 @@ class NodeType(Enum):
     UNKNOWN = 8
 
 
-NodeColors = {
-    NodeType.USDA: UIColors.GOLD,
-    NodeType.MDL: UIColors.MDL_GREEN,
-    NodeType.MTLX: UIColors.LIGHT_RED,
-    NodeType.OSL: UIColors.LIGHT_BLUE,
-    NodeType.NODE_GRAPH: UIColors.LIGHT_PURPLE,
-    NodeType.PARENT_INPUTS: UIColors.LIGHT_PURPLE,
-    NodeType.PARENT_OUTPUTS: UIColors.LIGHT_PURPLE,
-    NodeType.UNKNOWN: UIColors.LIGHT_GREY,
-}
-
-
 def MakeBorderWidgetStyle(
     backgroundColor: str = UIColors.CHARCOAL.value,
+    borderColor: str = "#000",
+    borderStyle: str = "inset",
 ) -> str:
     return f"""
         QWidget#ThisWidget {{
             background-color: {backgroundColor};
-            border-color: #000;
+            border-color: {borderColor};
             border-width: 1px;
-            border-style: inset;
+            border-style: {borderStyle};
         }}
     """
-
-
-BORDER_WIDGET_STYLE = MakeBorderWidgetStyle()
 
 
 def MakeNodeBackgroundStyle(backgroundColor: str) -> str:
@@ -105,10 +92,12 @@ DEFAULT_NODE_COLORS = {
     NodeType.UNKNOWN.name: UIColors.LIGHT_GREY.value,
 }
 
-
-def _NormalizeColor(value: str) -> str:
-    """Normalizes color strings so equivalent colors compare as equal."""
-    return value.lower() if isinstance(value, str) else value
+COLOR_FIELDS = (
+    "connectionColor",
+    "backgroundColor",
+    "gridColor",
+    "nodeBackgroundColor",
+)
 
 
 @dataclass
@@ -124,67 +113,52 @@ class GraphColors:
     nodeBackgroundColor: str = UIColors.CHARCOAL.value
 
     def __post_init__(self):
+        # Normalize so equivalent colors compare as equal.
         self.nodeColors = {
-            key: _NormalizeColor(value)
-            for key, value in self.nodeColors.items()
+            key: value.lower() for key, value in self.nodeColors.items()
         }
-        self.connectionColor = _NormalizeColor(self.connectionColor)
-        self.backgroundColor = _NormalizeColor(self.backgroundColor)
-        self.gridColor = _NormalizeColor(self.gridColor)
-        self.nodeBackgroundColor = _NormalizeColor(self.nodeBackgroundColor)
+        for name in COLOR_FIELDS:
+            setattr(self, name, getattr(self, name).lower())
 
     def GetNodeColor(self, nodeType: NodeType) -> str:
         """Returns the header color for the given node type."""
-        key = nodeType.name
-        if key not in self.nodeColors:
-            key = NodeType.NODE_GRAPH.name
-        return self.nodeColors.get(key, UIColors.LIGHT_GREY.value)
+        return self.nodeColors.get(
+            nodeType.name,
+            self.nodeColors.get(
+                NodeType.NODE_GRAPH.name, UIColors.LIGHT_GREY.value
+            ),
+        )
 
     def ToDict(self) -> dict:
         """Serializes the colors to a JSON-compatible dictionary."""
         return {
             "nodeColors": dict(self.nodeColors),
-            "connectionColor": self.connectionColor,
-            "backgroundColor": self.backgroundColor,
-            "gridColor": self.gridColor,
-            "nodeBackgroundColor": self.nodeBackgroundColor,
+            **{name: getattr(self, name) for name in COLOR_FIELDS},
         }
 
     @classmethod
     def FromDict(cls, data) -> GraphColors:
         """Restores colors from a dictionary, ignoring invalid entries."""
-        colors = cls()
         if not isinstance(data, dict):
-            return colors
+            return cls()
 
-        nodeColors = data.get("nodeColors")
-        if isinstance(nodeColors, dict):
-            for key in colors.nodeColors:
-                value = nodeColors.get(key)
+        values = {}
+        incomingNodeColors = data.get("nodeColors")
+        if isinstance(incomingNodeColors, dict):
+            nodeColors = dict(DEFAULT_NODE_COLORS)
+            for key in nodeColors:
+                value = incomingNodeColors.get(key)
                 if isinstance(value, str):
-                    colors.nodeColors[key] = _NormalizeColor(value)
+                    nodeColors[key] = value
+            values["nodeColors"] = nodeColors
 
-        for key in (
-            "connectionColor",
-            "backgroundColor",
-            "gridColor",
-            "nodeBackgroundColor",
-        ):
-            value = data.get(key)
+        for name in COLOR_FIELDS:
+            value = data.get(name)
             if isinstance(value, str):
-                setattr(colors, key, _NormalizeColor(value))
+                values[name] = value
 
-        return colors
+        return cls(**values)
 
-
-SELECTED_NODE_STYLE = f"""
-    QWidget#ThisWidget {{
-        background-color: #454545;
-        border-color: {UIColors.GOLD.value};
-        border-width: 1px;
-        border-style: solid;
-    }}
-"""
 
 AUX_BUTTON_STYLE = """
     QPushButton {

@@ -64,43 +64,44 @@ class GraphDockWidget(QtWidgets.QDockWidget):
             image.save(filePath)
 
     def ShowPreferencesDialog(self):
+        graphWidget = self.graphWidget
+        graphView = graphWidget.graphView
         dialog = PreferencesDialog(
             self,
-            self.graphWidget.GetFitViewMargin(),
-            self.graphWidget.GetNodeVerticalSpacing(),
-            self.graphWidget.GetHideScrollbars(),
-            self.graphWidget.GetShowAllOutputPorts(),
+            graphView.GetFitViewMargin(),
+            graphWidget.GetNodeVerticalSpacing(),
+            graphView.GetHideScrollbars(),
+            graphWidget.GetShowAllOutputPorts(),
             self.showNodeGraphShortcut,
-            self.graphWidget.GetColors(),
+            graphWidget.GetColors(),
         )
         try:
             if dialog.Run() != QtWidgets.QDialog.Accepted:
                 return
 
-            self.graphWidget.SetFitViewMargin(dialog.GetFitViewMargin())
-            self.graphWidget.SetHideScrollbars(dialog.GetHideScrollbars())
+            graphView.SetFitViewMargin(dialog.GetFitViewMargin())
+            graphView.SetHideScrollbars(dialog.GetHideScrollbars())
             self.SetShowNodeGraphShortcut(dialog.GetShowNodeGraphShortcut())
 
             nodeVerticalSpacing = dialog.GetNodeVerticalSpacing()
             spacingChanged = (
-                nodeVerticalSpacing != self.graphWidget.GetNodeVerticalSpacing()
+                nodeVerticalSpacing != graphWidget.GetNodeVerticalSpacing()
             )
-            self.graphWidget.SetNodeVerticalSpacing(nodeVerticalSpacing)
+            graphWidget.SetNodeVerticalSpacing(nodeVerticalSpacing)
 
             colors = dialog.GetColors()
-            colorsChanged = colors != self.graphWidget.GetColors()
-            self.graphWidget.SetColors(colors)
+            colorsChanged = colors != graphWidget.GetColors()
+            graphWidget.SetColors(colors)
 
             showAllOutputPorts = dialog.GetShowAllOutputPorts()
             if (
-                showAllOutputPorts
-                == self.graphWidget.GetShowAllOutputPorts()
+                showAllOutputPorts == graphWidget.GetShowAllOutputPorts()
                 and not spacingChanged
                 and not colorsChanged
             ):
                 return
 
-            self.graphWidget.SetShowAllOutputPorts(showAllOutputPorts)
+            graphWidget.SetShowAllOutputPorts(showAllOutputPorts)
             if self.nodeGraph is not None:
                 self.UpdateContentForOutput()
         finally:
@@ -124,6 +125,13 @@ class GraphDockWidget(QtWidgets.QDockWidget):
         action.triggered.connect(callback)
         return action
 
+    def AddToggleAction(self, menu, text, checked, callback):
+        action = menu.addAction(text)
+        action.setCheckable(True)
+        action.setChecked(checked)
+        action.triggered.connect(lambda *args: callback())
+        return action
+
     def UpdateMenuBar(self):
         menuBar = QtWidgets.QMenuBar(self)
         # On macOS a native menu bar is merged into usdview's global one.
@@ -141,28 +149,31 @@ class GraphDockWidget(QtWidgets.QDockWidget):
         self.AddViewAction(
             viewMenu, "Frame All", "A", self.graphWidget.FrameAll
         )
-        self.AddViewAction(viewMenu, "Zoom In", "+", self.graphWidget.ZoomIn)
-        self.AddViewAction(viewMenu, "Zoom Out", "-", self.graphWidget.ZoomOut)
+        self.AddViewAction(
+            viewMenu, "Zoom In", "+", self.graphWidget.graphView.ZoomIn
+        )
+        self.AddViewAction(
+            viewMenu, "Zoom Out", "-", self.graphWidget.graphView.ZoomOut
+        )
         viewMenu.addSeparator()
 
         outputMenu = viewMenu.addMenu("Filter Output")
 
-        noneOutputAction = outputMenu.addAction("None")
-        noneOutputAction.setCheckable(True)
-        noneOutputAction.setChecked(self.selectedOutput is None)
-        noneOutputAction.triggered.connect(
-            lambda *args: self.SwitchToOutput(None)
+        self.AddToggleAction(
+            outputMenu,
+            "None",
+            self.selectedOutput is None,
+            lambda: self.SwitchToOutput(None),
         )
         outputMenu.addSeparator()
 
-        outputs = self.nodeGraph.GetOutputs()
-
-        for output in outputs:
-            name = output.GetBaseName()
-            a = outputMenu.addAction(name)
-            a.setCheckable(True)
-            a.setChecked(output == self.selectedOutput)
-            a.triggered.connect(lambda *args, o=output: self.SwitchToOutput(o))
+        for output in self.nodeGraph.GetOutputs():
+            self.AddToggleAction(
+                outputMenu,
+                output.GetBaseName(),
+                output == self.selectedOutput,
+                lambda o=output: self.SwitchToOutput(o),
+            )
 
         toolsMenu = menuBar.addMenu("Tools")
 
@@ -208,13 +219,17 @@ class GraphDockWidget(QtWidgets.QDockWidget):
 
     def GetDefaultOutput(self):
         # For materials, we try to select the 'surface' output. For NGs, none.
-        if self.nodeGraph.GetPrim().IsA(UsdShade.Material):
-            outputs = self.nodeGraph.GetOutputs()
+        if not self.nodeGraph.GetPrim().IsA(UsdShade.Material):
+            return None
 
-            for output in outputs:
-                if "surface" in output.GetBaseName():
-                    return output
-        return None
+        return next(
+            (
+                output
+                for output in self.nodeGraph.GetOutputs()
+                if "surface" in output.GetBaseName()
+            ),
+            None,
+        )
 
     def SetNodeGraph(self, nodeGraph):
         # Store old NGs on a stack so that we can navigate back using the menu
@@ -330,9 +345,13 @@ class UsdShadeViewDockState(StateSource):
         )
 
     def Restore(self):
+        dockWidget = self._dockWidget
+        graphWidget = dockWidget.graphWidget
+        graphView = graphWidget.graphView
+
         # Show a restored floating dock without activating it: otherwise its
         # window becomes key and usdview's menu bar is replaced (macOS).
-        self._dockWidget.setAttribute(QtCore.Qt.WA_ShowWithoutActivating, True)
+        dockWidget.setAttribute(QtCore.Qt.WA_ShowWithoutActivating, True)
         try:
             if self.dockState:
                 state = QtCore.QByteArray.fromBase64(
@@ -344,37 +363,28 @@ class UsdShadeViewDockState(StateSource):
                         file=sys.stderr,
                     )
 
-            self._dockWidget.graphWidget.SetFitViewMargin(self.fitViewMargin)
-            self._dockWidget.graphWidget.SetNodeVerticalSpacing(
-                self.nodeVerticalSpacing
-            )
-            self._dockWidget.graphWidget.SetColors(
-                GraphColors.FromDict(self.graphColors)
-            )
-            self._dockWidget.graphWidget.SetHideScrollbars(self.hideScrollbars)
-            self._dockWidget.graphWidget.SetShowAllOutputPorts(
-                self.showAllOutputPorts
-            )
-            self._dockWidget.SetShowNodeGraphShortcut(
-                self.showNodeGraphShortcut
-            )
-            self._dockWidget.setVisible(self.dockVisible)
+            graphView.SetFitViewMargin(self.fitViewMargin)
+            graphWidget.SetNodeVerticalSpacing(self.nodeVerticalSpacing)
+            graphWidget.SetColors(GraphColors.FromDict(self.graphColors))
+            graphView.SetHideScrollbars(self.hideScrollbars)
+            graphWidget.SetShowAllOutputPorts(self.showAllOutputPorts)
+            dockWidget.SetShowNodeGraphShortcut(self.showNodeGraphShortcut)
+            dockWidget.setVisible(self.dockVisible)
         finally:
-            self._dockWidget.setAttribute(
-                QtCore.Qt.WA_ShowWithoutActivating, False
-            )
+            dockWidget.setAttribute(QtCore.Qt.WA_ShowWithoutActivating, False)
 
     def onSaveState(self, state):
+        graphWidget = self._dockWidget.graphWidget
+        graphView = graphWidget.graphView
+
         state["dockState"] = base64.b64encode(
             self._mainWindow.saveState().data()
         ).decode("ascii")
         state["dockVisible"] = self._dockWidget.isVisible()
-
-        graphWidget = self._dockWidget.graphWidget
-        state["fitViewMargin"] = graphWidget.GetFitViewMargin()
+        state["fitViewMargin"] = graphView.GetFitViewMargin()
         state["nodeVerticalSpacing"] = graphWidget.GetNodeVerticalSpacing()
         state["graphColors"] = graphWidget.GetColors().ToDict()
-        state["hideScrollbars"] = graphWidget.GetHideScrollbars()
+        state["hideScrollbars"] = graphView.GetHideScrollbars()
         state["showAllOutputPorts"] = graphWidget.GetShowAllOutputPorts()
         state["showNodeGraphShortcut"] = (
             self._dockWidget.GetShowNodeGraphShortcut()

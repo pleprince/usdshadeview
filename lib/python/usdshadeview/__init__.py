@@ -36,13 +36,10 @@ from .connections import ConnectionWidget, SplineConnectionWidget
 from .constants import (
     ARRAY_BUTTON_STYLE,
     AUX_BUTTON_STYLE,
-    BORDER_WIDGET_STYLE,
     DEFAULT_FIT_VIEW_MARGIN,
     DEFAULT_NODE_VERTICAL_SPACING,
     MAX_NODE_GRAPH_DEPTH,
-    SELECTED_NODE_STYLE,
     GraphColors,
-    NodeColors,
     NodeType,
     PortType,
     UIColors,

@@ -22,6 +22,7 @@ from pxr.Usdviewq.qt import QtCore, QtGui, QtWidgets
 from .constants import (
     AUX_BUTTON_STYLE,
     GraphColors,
+    MakeBorderWidgetStyle,
     NodeType,
     PortType,
     UIColors,
@@ -32,8 +33,14 @@ from .value_widgets import MakePortWidget, MakePropertyWidget
 
 
 class GraphNode(QtWidgets.QGraphicsWidget):
+    SELECTED_BACKGROUND_FACTOR = 115
+
     def __init__(self, colors=None):
+        # Assigned before super().__init__() because Qt calls sizeHint and
+        # setGeometry while the base class is being constructed.
         self.colors = colors if colors is not None else GraphColors()
+        self.body = None
+        self.proxy = None
 
         super().__init__()
 
@@ -56,33 +63,29 @@ class GraphNode(QtWidgets.QGraphicsWidget):
 
     def MakeBodyStyle(self, selected=False):
         backgroundColor = self.colors.nodeBackgroundColor
-        if selected:
-            backgroundColor = QtGui.QColor(backgroundColor).lighter(115).name()
+        if not selected:
+            return MakeBorderWidgetStyle(backgroundColor)
 
-        borderColor = UIColors.GOLD.value if selected else "#000"
-        borderStyle = "solid" if selected else "inset"
-
-        return f"""
-            QWidget#ThisWidget {{
-                background-color: {backgroundColor};
-                border-color: {borderColor};
-                border-width: 1px;
-                border-style: {borderStyle};
-            }}
-        """
+        selectedBackground = (
+            QtGui.QColor(backgroundColor)
+            .lighter(self.SELECTED_BACKGROUND_FACTOR)
+            .name()
+        )
+        return MakeBorderWidgetStyle(
+            selectedBackground, UIColors.GOLD.value, "solid"
+        )
 
     def sizeHint(self, which, constraint):
         # The parented proxy reports its hint minus its frame margins; use the
         # body directly to preserve the sizes the proxy had as a layout item.
-        body = getattr(self, "body", None)
-        if body is None or which == QtCore.Qt.MaximumSize:
+        if self.body is None or which == QtCore.Qt.MaximumSize:
             return super().sizeHint(which, constraint)
         if which == QtCore.Qt.MinimumSize:
-            return QtCore.QSizeF(body.minimumSizeHint())
-        return QtCore.QSizeF(body.sizeHint())
+            return QtCore.QSizeF(self.body.minimumSizeHint())
+        return QtCore.QSizeF(self.body.sizeHint())
 
     def setGeometry(self, rect):
-        if getattr(self, "proxy", None) is not None:
+        if self.proxy is not None:
             self.proxy.setGeometry(
                 QtCore.QRectF(QtCore.QPointF(0, 0), rect.size())
             )
@@ -270,7 +273,6 @@ class ShaderNode(GraphNode):
         colors=None,
         dialogParent=None,
     ):
-        colors = colors if colors is not None else GraphColors()
         super().__init__(colors)
 
         self.ngChangeCallback = ngChangeCallback
