@@ -43,7 +43,11 @@ class GraphDockWidget(QtWidgets.QDockWidget):
 
     def ShowBakeMtlxDialog(self):
         material = UsdShade.Material(self.nodeGraph)
-        self.bakeMtlxDialog = BakeMtlxDialog(material)
+        previousDialog = getattr(self, "bakeMtlxDialog", None)
+        if previousDialog is not None:
+            previousDialog.close()
+            previousDialog.deleteLater()
+        self.bakeMtlxDialog = BakeMtlxDialog(material, self)
         self.bakeMtlxDialog.show()
 
     def ShowExportAsImageDialog(self):
@@ -61,7 +65,7 @@ class GraphDockWidget(QtWidgets.QDockWidget):
 
     def ShowPreferencesDialog(self):
         dialog = PreferencesDialog(
-            self.window(),
+            self,
             self.graphWidget.GetFitViewMargin(),
             self.graphWidget.GetNodeVerticalSpacing(),
             self.graphWidget.GetHideScrollbars(),
@@ -69,34 +73,38 @@ class GraphDockWidget(QtWidgets.QDockWidget):
             self.showNodeGraphShortcut,
             self.graphWidget.GetColors(),
         )
-        if dialog.Run() != QtWidgets.QDialog.Accepted:
-            return
+        try:
+            if dialog.Run() != QtWidgets.QDialog.Accepted:
+                return
 
-        self.graphWidget.SetFitViewMargin(dialog.GetFitViewMargin())
-        self.graphWidget.SetHideScrollbars(dialog.GetHideScrollbars())
-        self.SetShowNodeGraphShortcut(dialog.GetShowNodeGraphShortcut())
+            self.graphWidget.SetFitViewMargin(dialog.GetFitViewMargin())
+            self.graphWidget.SetHideScrollbars(dialog.GetHideScrollbars())
+            self.SetShowNodeGraphShortcut(dialog.GetShowNodeGraphShortcut())
 
-        nodeVerticalSpacing = dialog.GetNodeVerticalSpacing()
-        spacingChanged = (
-            nodeVerticalSpacing != self.graphWidget.GetNodeVerticalSpacing()
-        )
-        self.graphWidget.SetNodeVerticalSpacing(nodeVerticalSpacing)
+            nodeVerticalSpacing = dialog.GetNodeVerticalSpacing()
+            spacingChanged = (
+                nodeVerticalSpacing != self.graphWidget.GetNodeVerticalSpacing()
+            )
+            self.graphWidget.SetNodeVerticalSpacing(nodeVerticalSpacing)
 
-        colors = dialog.GetColors()
-        colorsChanged = colors != self.graphWidget.GetColors()
-        self.graphWidget.SetColors(colors)
+            colors = dialog.GetColors()
+            colorsChanged = colors != self.graphWidget.GetColors()
+            self.graphWidget.SetColors(colors)
 
-        showAllOutputPorts = dialog.GetShowAllOutputPorts()
-        if (
-            showAllOutputPorts == self.graphWidget.GetShowAllOutputPorts()
-            and not spacingChanged
-            and not colorsChanged
-        ):
-            return
+            showAllOutputPorts = dialog.GetShowAllOutputPorts()
+            if (
+                showAllOutputPorts
+                == self.graphWidget.GetShowAllOutputPorts()
+                and not spacingChanged
+                and not colorsChanged
+            ):
+                return
 
-        self.graphWidget.SetShowAllOutputPorts(showAllOutputPorts)
-        if self.nodeGraph is not None:
-            self.UpdateContentForOutput()
+            self.graphWidget.SetShowAllOutputPorts(showAllOutputPorts)
+            if self.nodeGraph is not None:
+                self.UpdateContentForOutput()
+        finally:
+            dialog.deleteLater()
 
     def GetShowNodeGraphShortcut(self):
         return self.showNodeGraphShortcut
@@ -255,7 +263,7 @@ class GraphDockWidget(QtWidgets.QDockWidget):
         self.placeholderLabel.setAlignment(QtCore.Qt.AlignCenter)
         self.contentLayout.addWidget(self.placeholderLabel, 1)
 
-        self.graphWidget = GraphWidget(self.SetNodeGraph)
+        self.graphWidget = GraphWidget(self.SetNodeGraph, self)
         self.contentLayout.addWidget(self.graphWidget, 1)
         self.setWidget(contentWidget)
         self.graphWidget.hide()

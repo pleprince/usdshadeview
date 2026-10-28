@@ -44,10 +44,11 @@ from .utils import (
 
 # Sets up a context menu on a value widget
 class ValueProxyWidget(QtWidgets.QWidget):
-    def __init__(self, value, nodeInput):
+    def __init__(self, value, nodeInput, dialogParent=None):
         super().__init__()
         self.value = value
         self.nodeInput = nodeInput
+        self.dialogParent = dialogParent
         self.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
         self.customContextMenuRequested.connect(self.ShowValueContextMenu)
 
@@ -92,7 +93,7 @@ class ValueProxyWidget(QtWidgets.QWidget):
             cb = QtWidgets.QApplication.clipboard()
             cb.setText(cbStr)
         elif selectedAction == a2:
-            OpenMetadataDialog(self.nodeInput, metadata)
+            OpenMetadataDialog(self.nodeInput, metadata, self.dialogParent)
         elif isLocalFile and selectedAction == a3:
             OpenFileWithSystem(filePath)
         elif isLocalFile and selectedAction == a4:
@@ -104,12 +105,13 @@ def MakeValueProxyWidget(
     value,
     nodeInput,
     nodeBackgroundColor: str = UIColors.CHARCOAL.value,
+    dialogParent=None,
 ):
     layout = QtWidgets.QHBoxLayout()
     layout.setContentsMargins(0, 0, 0, 0)
     layout.addWidget(widget)
 
-    proxy = ValueProxyWidget(value, nodeInput)
+    proxy = ValueProxyWidget(value, nodeInput, dialogParent)
     proxy.setLayout(layout)
     proxy.setObjectName("NodeBackground")
     proxy.setStyleSheet(MakeNodeBackgroundStyle(nodeBackgroundColor))
@@ -428,16 +430,21 @@ def MakeValueStr(value, typeName):
         return ToString(value)
 
 
-def MakeArrayValueWidget(value):
+def MakeArrayValueWidget(value, dialogParent=None):
     button = QtWidgets.QPushButton("Array")
     button.setToolTip("Show Array")
     button.setStyleSheet(ARRAY_BUTTON_STYLE)
-    button.clicked.connect(lambda *args, v=value: ShowValueArrayDialog(v))
+    button.clicked.connect(
+        lambda *args, v=value: ShowValueArrayDialog(v, dialogParent)
+    )
     return button
 
 
 def MakeValueWidget(
-    value, typeName, nodeBackgroundColor: str = UIColors.CHARCOAL.value
+    value,
+    typeName,
+    nodeBackgroundColor: str = UIColors.CHARCOAL.value,
+    dialogParent=None,
 ):
 
     isColor3 = typeName in {
@@ -507,7 +514,7 @@ def MakeValueWidget(
             value, nodeBackgroundColor
         )
     elif typeName.isArray:
-        widget = MakeArrayValueWidget(value)
+        widget = MakeArrayValueWidget(value, dialogParent)
     else:
         valueStr = MakeValueStr(value, typeName)
         toolTipStr = valueStr
@@ -539,6 +546,7 @@ def MakePortRowWidget(
     port,
     portType,
     nodeBackgroundColor: str = UIColors.CHARCOAL.value,
+    dialogParent=None,
 ):
     nameRlAlign = (
         QtCore.Qt.AlignRight
@@ -554,11 +562,15 @@ def MakePortRowWidget(
         return nameWidget, nameWidget
 
     orientation, valueWidget = MakeValueWidget(
-        value, typeName, nodeBackgroundColor
+        value, typeName, nodeBackgroundColor, dialogParent
     )
 
     valueWidget = MakeValueProxyWidget(
-        valueWidget, value, port, nodeBackgroundColor
+        valueWidget,
+        value,
+        port,
+        nodeBackgroundColor,
+        dialogParent,
     )
 
     if orientation == QtCore.Qt.Horizontal:
@@ -580,22 +592,39 @@ def MakePortRowWidget(
 
 
 def MakePortWidget(
-    port, portType, nodeBackgroundColor: str = UIColors.CHARCOAL.value
+    port,
+    portType,
+    nodeBackgroundColor: str = UIColors.CHARCOAL.value,
+    dialogParent=None,
 ):
     name = port.GetBaseName()
     typeName = port.GetTypeName()
     value = None if type(port) == UsdShade.Output else port.Get()
     return MakePortRowWidget(
-        name, typeName, value, port, portType, nodeBackgroundColor
+        name,
+        typeName,
+        value,
+        port,
+        portType,
+        nodeBackgroundColor,
+        dialogParent,
     )
 
 
 def MakePropertyWidget(
-    attr, nodeBackgroundColor: str = UIColors.CHARCOAL.value
+    attr,
+    nodeBackgroundColor: str = UIColors.CHARCOAL.value,
+    dialogParent=None,
 ):
     name = attr.GetBaseName()
     typeName = attr.GetTypeName()
     value = attr.Get()
     return MakePortRowWidget(
-        name, typeName, value, None, PortType.INPUT, nodeBackgroundColor
+        name,
+        typeName,
+        value,
+        None,
+        PortType.INPUT,
+        nodeBackgroundColor,
+        dialogParent,
     )

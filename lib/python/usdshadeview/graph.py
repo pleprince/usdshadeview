@@ -213,10 +213,11 @@ class GraphView(QtWidgets.QGraphicsView):
 
 
 class GraphWidget(QtWidgets.QWidget):
-    def __init__(self, ngChangeCallback):
+    def __init__(self, ngChangeCallback, dialogParent=None):
         super().__init__()
 
         self.ngChangeCallback = ngChangeCallback
+        self.dialogParent = dialogParent
 
         self.selectedNodes = []
         self.nodeFilterTargets = {}
@@ -373,7 +374,12 @@ class GraphWidget(QtWidgets.QWidget):
         for ngPrim, (depth, inputNames) in self.parentNgInputMap.items():
             nodeGraph = UsdShade.NodeGraph(ngPrim)
             ngInputs = [nodeGraph.GetInput(name) for name in inputNames]
-            node = MakeNgInputNode(nodeGraph, ngInputs, self.colors)
+            node = MakeNgInputNode(
+                nodeGraph,
+                ngInputs,
+                self.colors,
+                self.dialogParent,
+            )
 
             columnIndex = maxDepth - depth - 1
             self.parentNgNodeMap[ngPrim] = AddNodeToColumn(
@@ -385,13 +391,19 @@ class GraphWidget(QtWidgets.QWidget):
             if prim == directParentPrim:
                 nodeGraph = UsdShade.NodeGraph(prim)
                 outputs = nodeGraph.GetOutputs()
-                node = MakeNgOutputNode(prim, outputs, self.colors)
+                node = MakeNgOutputNode(
+                    prim,
+                    outputs,
+                    self.colors,
+                    self.dialogParent,
+                )
             else:
                 node = MakeSdrShaderNode(
                     prim,
                     self.ngChangeCallback,
                     self.showAllOutputPorts,
                     self.colors,
+                    self.dialogParent,
                 )
 
             columnIndex = maxDepth - depth - 1

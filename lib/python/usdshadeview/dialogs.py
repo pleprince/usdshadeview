@@ -27,8 +27,8 @@ from .constants import GraphColors, NodeType
 
 
 class BakeMtlxDialog(QtWidgets.QDialog):
-    def __init__(self, material):
-        super().__init__()
+    def __init__(self, material, parent=None):
+        super().__init__(parent)
         self.material = material
 
         self.setWindowTitle("Bake to Texture")
@@ -147,8 +147,8 @@ class MetadataDialog(QtWidgets.QDialog):
         table.setShowGrid(False)
         return table
 
-    def __init__(self, metadata):
-        super().__init__()
+    def __init__(self, metadata, parent=None):
+        super().__init__(parent)
 
         data = self.MakeDataBacking(metadata)
         table = self.MakeTableViewFromData(data)
@@ -163,15 +163,19 @@ class MetadataDialog(QtWidgets.QDialog):
         self.setFixedHeight(self.sizeHint().height())
 
 
-def OpenMetadataDialog(nodeInput, metadata):
+def OpenMetadataDialog(nodeInput, metadata, parent=None):
     if nodeInput in metadataDialogs:
         d = metadataDialogs[nodeInput]
         if d.isVisible():  # check if window was closed
-            d.raise_()
-            d.activateWindow()
-            return
+            if parent is None or d.parentWidget() is parent:
+                d.raise_()
+                d.activateWindow()
+                return
+            d.close()
+        d.deleteLater()
+        metadataDialogs.pop(nodeInput, None)
 
-    d = MetadataDialog(metadata)
+    d = MetadataDialog(metadata, parent)
     metadataDialogs[nodeInput] = d
     d.show()
 
@@ -241,8 +245,8 @@ class NodeDefDialog(QtWidgets.QDialog):
         table.setShowGrid(False)
         return table
 
-    def __init__(self, nodeDef):
-        super().__init__()
+    def __init__(self, nodeDef, parent=None):
+        super().__init__(parent)
 
         name = nodeDef.GetIdentifier()
         family = nodeDef.GetFamily()
@@ -296,22 +300,26 @@ class NodeDefDialog(QtWidgets.QDialog):
         self.setLayout(layout)
         self.setWindowTitle(name)
         # fixed size to remove 'maximize' button
-        self.setFixedWidth(self.size().width())
+        self.setFixedWidth(self.sizeHint().width())
         self.setFixedHeight(self.sizeHint().height())
 
 
-def OpenNodeDefDialog(ndId):
+def OpenNodeDefDialog(ndId, parent=None):
     if ndId in nodeDefDialogs:
         d = nodeDefDialogs[ndId]
         if d.isVisible():  # check if window was closed
-            d.raise_()
-            d.activateWindow()
-            return
+            if parent is None or d.parentWidget() is parent:
+                d.raise_()
+                d.activateWindow()
+                return
+            d.close()
+        d.deleteLater()
+        nodeDefDialogs.pop(ndId, None)
 
     reg = Sdr.Registry()
     nd = reg.GetShaderNodeByIdentifier(ndId)
     if nd is not None:
-        d = NodeDefDialog(nd)
+        d = NodeDefDialog(nd, parent)
         nodeDefDialogs[ndId] = d
         d.show()
 
@@ -498,8 +506,8 @@ class PreferencesDialog(QtWidgets.QDialog):
 
 
 class ValueArrayDialog(QtWidgets.QDialog):
-    def __init__(self, values):
-        super().__init__()
+    def __init__(self, values, parent=None):
+        super().__init__(parent)
 
         self.setWindowTitle("Array Values")
 
@@ -519,9 +527,12 @@ class ValueArrayDialog(QtWidgets.QDialog):
         self.setFixedHeight(self.sizeHint().height())
 
 
-def ShowValueArrayDialog(value):
-    d = ValueArrayDialog(value)
-    if PySideModule == "PySide6":
-        d.exec()
-    else:
-        d.exec_()
+def ShowValueArrayDialog(value, parent=None):
+    d = ValueArrayDialog(value, parent)
+    try:
+        if PySideModule == "PySide6":
+            d.exec()
+        else:
+            d.exec_()
+    finally:
+        d.deleteLater()

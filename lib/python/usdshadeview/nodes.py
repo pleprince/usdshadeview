@@ -184,7 +184,10 @@ class ShaderNode(GraphNode):
                             continue
 
             rowWidget, nameWidget = MakePortWidget(
-                i, PortType.INPUT, self.colors.nodeBackgroundColor
+                i,
+                PortType.INPUT,
+                self.colors.nodeBackgroundColor,
+                self.dialogParent,
             )
 
             portLayout.addWidget(rowWidget)
@@ -196,7 +199,9 @@ class ShaderNode(GraphNode):
             for p in props:
                 name = p.GetBaseName()
                 rowWidget, nameWidget = MakePropertyWidget(
-                    p, self.colors.nodeBackgroundColor
+                    p,
+                    self.colors.nodeBackgroundColor,
+                    self.dialogParent,
                 )
                 portLayout.addWidget(rowWidget)
                 self.inputPortWidgets[name] = nameWidget
@@ -206,7 +211,10 @@ class ShaderNode(GraphNode):
 
             if self.nodeType == NodeType.PARENT_INPUTS:
                 rowWidget, nameWidget = MakePortWidget(
-                    i, PortType.OUTPUT, self.colors.nodeBackgroundColor
+                    i,
+                    PortType.OUTPUT,
+                    self.colors.nodeBackgroundColor,
+                    self.dialogParent,
                 )
                 portLayout.addWidget(rowWidget)
                 self.outputPortWidgets[name] = rowWidget
@@ -231,7 +239,7 @@ class ShaderNode(GraphNode):
 
         ndId = self.shaderOrNG.GetShaderId()
         if ndId is not None:
-            OpenNodeDefDialog(ndId)
+            OpenNodeDefDialog(ndId, self.dialogParent)
 
     def GetPortPosition(self, name, portType):
         x = 0 if portType == PortType.INPUT else self.size().width()
@@ -260,6 +268,7 @@ class ShaderNode(GraphNode):
         props=None,
         showAllOutputPorts=False,
         colors=None,
+        dialogParent=None,
     ):
         colors = colors if colors is not None else GraphColors()
         super().__init__(colors)
@@ -268,6 +277,7 @@ class ShaderNode(GraphNode):
         self.shaderOrNG = shaderOrNG
         self.nodeType = nodeType
         self.showAllOutputPorts = showAllOutputPorts
+        self.dialogParent = dialogParent
         self.outputPortNames = [i.GetBaseName() for i in outputs]
 
         # We use these widgets to get the positions that the connector
@@ -326,7 +336,11 @@ class ShaderNode(GraphNode):
 
 
 def MakeSdrShaderNode(
-    prim, ngChangeCallback, showAllOutputPorts=False, colors=None
+    prim,
+    ngChangeCallback,
+    showAllOutputPorts=False,
+    colors=None,
+    dialogParent=None,
 ):
     shaderOrNG = UsdShade.Shader(prim)
     if not shaderOrNG:
@@ -353,18 +367,29 @@ def MakeSdrShaderNode(
         props,
         showAllOutputPorts,
         colors,
+        dialogParent,
     )
 
 
-def MakeNgInputNode(nodeGraph, inputs, colors=None):
+def MakeNgInputNode(nodeGraph, inputs, colors=None, dialogParent=None):
     nodeName = nodeGraph.GetPrim().GetName()
     return ShaderNode(
-        nodeName, NodeType.PARENT_INPUTS, [], inputs, colors=colors
+        nodeName,
+        NodeType.PARENT_INPUTS,
+        [],
+        inputs,
+        colors=colors,
+        dialogParent=dialogParent,
     )
 
 
-def MakeNgOutputNode(nodeGraph, outputs, colors=None):
+def MakeNgOutputNode(nodeGraph, outputs, colors=None, dialogParent=None):
     nodeName = nodeGraph.GetPrim().GetName()
     return ShaderNode(
-        nodeName, NodeType.PARENT_OUTPUTS, outputs, [], colors=colors
+        nodeName,
+        NodeType.PARENT_OUTPUTS,
+        outputs,
+        [],
+        colors=colors,
+        dialogParent=dialogParent,
     )

@@ -131,7 +131,12 @@ class UsdShadeViewContainer(PluginContainer):
                 item = plugRegistry.registerCommandPlugin(
                     f"{self.SDR_NODES_COMMAND_NS}.{ndId}",
                     ndId,
-                    lambda *args, n=ndId: OpenNodeDefDialog(n),
+                    lambda *args, n=ndId: OpenNodeDefDialog(
+                        n,
+                        self.dockWidget
+                        if self.dockWidget.isVisible()
+                        else self.usdviewApi.qMainWindow,
+                    ),
                 )
                 sdrNodeMenu.addItem(item)
 
