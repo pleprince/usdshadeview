@@ -16,6 +16,9 @@
 
 """Shared constants, colors and styles for the usdshadeview plugin."""
 
+from __future__ import annotations
+
+from dataclasses import dataclass, field
 from enum import Enum
 
 # Abortion criterium for circular node graphs
@@ -64,17 +67,115 @@ NodeColors = {
     NodeType.UNKNOWN: UIColors.LIGHT_GREY,
 }
 
-BORDER_WIDGET_STYLE = f"""
-    QWidget#ThisWidget {{
-        background-color: {UIColors.CHARCOAL.value};
-        border-color: #000;
-        border-width: 1px;
-        border-style: inset;
-    }}
-"""
+
+def MakeBorderWidgetStyle(
+    backgroundColor: str = UIColors.CHARCOAL.value,
+) -> str:
+    return f"""
+        QWidget#ThisWidget {{
+            background-color: {backgroundColor};
+            border-color: #000;
+            border-width: 1px;
+            border-style: inset;
+        }}
+    """
+
+
+BORDER_WIDGET_STYLE = MakeBorderWidgetStyle()
+
+
+def MakeNodeBackgroundStyle(backgroundColor: str) -> str:
+    return f"""
+        QWidget#NodeBackground {{
+            background-color: {backgroundColor};
+        }}
+    """
+
 
 # Connections and their port markers share this color.
 SPLINE_COLOR = "#ffffff"
+
+# Default colors for the customizable graph elements.
+DEFAULT_NODE_COLORS = {
+    NodeType.USDA.name: UIColors.GOLD.value,
+    NodeType.MDL.name: UIColors.MDL_GREEN.value,
+    NodeType.MTLX.name: UIColors.LIGHT_RED.value,
+    NodeType.OSL.name: UIColors.LIGHT_BLUE.value,
+    NodeType.NODE_GRAPH.name: UIColors.LIGHT_PURPLE.value,
+    NodeType.UNKNOWN.name: UIColors.LIGHT_GREY.value,
+}
+
+
+def _NormalizeColor(value: str) -> str:
+    """Normalizes color strings so equivalent colors compare as equal."""
+    return value.lower() if isinstance(value, str) else value
+
+
+@dataclass
+class GraphColors:
+    """User-configurable colors used to draw the node graph."""
+
+    nodeColors: dict[str, str] = field(
+        default_factory=lambda: dict(DEFAULT_NODE_COLORS)
+    )
+    connectionColor: str = SPLINE_COLOR
+    backgroundColor: str = UIColors.CHARCOAL.value
+    gridColor: str = UIColors.DARK_GREY.value
+    nodeBackgroundColor: str = UIColors.CHARCOAL.value
+
+    def __post_init__(self):
+        self.nodeColors = {
+            key: _NormalizeColor(value)
+            for key, value in self.nodeColors.items()
+        }
+        self.connectionColor = _NormalizeColor(self.connectionColor)
+        self.backgroundColor = _NormalizeColor(self.backgroundColor)
+        self.gridColor = _NormalizeColor(self.gridColor)
+        self.nodeBackgroundColor = _NormalizeColor(self.nodeBackgroundColor)
+
+    def GetNodeColor(self, nodeType: NodeType) -> str:
+        """Returns the header color for the given node type."""
+        key = nodeType.name
+        if key not in self.nodeColors:
+            key = NodeType.NODE_GRAPH.name
+        return self.nodeColors.get(key, UIColors.LIGHT_GREY.value)
+
+    def ToDict(self) -> dict:
+        """Serializes the colors to a JSON-compatible dictionary."""
+        return {
+            "nodeColors": dict(self.nodeColors),
+            "connectionColor": self.connectionColor,
+            "backgroundColor": self.backgroundColor,
+            "gridColor": self.gridColor,
+            "nodeBackgroundColor": self.nodeBackgroundColor,
+        }
+
+    @classmethod
+    def FromDict(cls, data) -> GraphColors:
+        """Restores colors from a dictionary, ignoring invalid entries."""
+        colors = cls()
+        if not isinstance(data, dict):
+            return colors
+
+        nodeColors = data.get("nodeColors")
+        if isinstance(nodeColors, dict):
+            for key in colors.nodeColors:
+                value = nodeColors.get(key)
+                if isinstance(value, str):
+                    colors.nodeColors[key] = _NormalizeColor(value)
+
+        for key in (
+            "connectionColor",
+            "backgroundColor",
+            "gridColor",
+            "nodeBackgroundColor",
+        ):
+            value = data.get(key)
+            if isinstance(value, str):
+                setattr(colors, key, _NormalizeColor(value))
+
+        return colors
+
 
 SELECTED_NODE_STYLE = f"""
     QWidget#ThisWidget {{

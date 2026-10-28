@@ -17,15 +17,14 @@
 """Node widgets and their factory functions."""
 
 from pxr import Sdr, Usd, UsdShade
-from pxr.Usdviewq.qt import QtCore, QtWidgets
+from pxr.Usdviewq.qt import QtCore, QtGui, QtWidgets
 
 from .constants import (
     AUX_BUTTON_STYLE,
-    BORDER_WIDGET_STYLE,
-    SELECTED_NODE_STYLE,
-    NodeColors,
+    GraphColors,
     NodeType,
     PortType,
+    UIColors,
 )
 from .dialogs import OpenNodeDefDialog
 from .utils import GetShaderNodeType, IsDefaultOutputPortName
@@ -33,7 +32,9 @@ from .value_widgets import MakePortWidget, MakePropertyWidget
 
 
 class GraphNode(QtWidgets.QGraphicsWidget):
-    def __init__(self):
+    def __init__(self, colors=None):
+        self.colors = colors if colors is not None else GraphColors()
+
         super().__init__()
 
         self.selected = False
@@ -42,7 +43,7 @@ class GraphNode(QtWidgets.QGraphicsWidget):
 
         self.body = QtWidgets.QFrame()
         self.body.setObjectName("ThisWidget")
-        self.body.setStyleSheet(BORDER_WIDGET_STYLE)
+        self.body.setStyleSheet(self.MakeBodyStyle())
 
         nodeLayout = QtWidgets.QVBoxLayout()
         nodeLayout.setContentsMargins(0, 0, 0, 0)
@@ -52,6 +53,23 @@ class GraphNode(QtWidgets.QGraphicsWidget):
         self.proxy = QtWidgets.QGraphicsProxyWidget(self)
         self.proxy.setWidget(self.body)
         self.proxy.setPos(0, 0)
+
+    def MakeBodyStyle(self, selected=False):
+        backgroundColor = self.colors.nodeBackgroundColor
+        if selected:
+            backgroundColor = QtGui.QColor(backgroundColor).lighter(115).name()
+
+        borderColor = UIColors.GOLD.value if selected else "#000"
+        borderStyle = "solid" if selected else "inset"
+
+        return f"""
+            QWidget#ThisWidget {{
+                background-color: {backgroundColor};
+                border-color: {borderColor};
+                border-width: 1px;
+                border-style: {borderStyle};
+            }}
+        """
 
     def sizeHint(self, which, constraint):
         # The parented proxy reports its hint minus its frame margins; use the
@@ -75,9 +93,7 @@ class GraphNode(QtWidgets.QGraphicsWidget):
             return
 
         self.selected = selected
-        self.body.setStyleSheet(
-            SELECTED_NODE_STYLE if selected else BORDER_WIDGET_STYLE
-        )
+        self.body.setStyleSheet(self.MakeBodyStyle(selected))
 
     def AddHeader(
         self, title, subtitle, color, auxButtonText="", auxButtonTooltip=""
@@ -108,7 +124,7 @@ class GraphNode(QtWidgets.QGraphicsWidget):
         headerFrame = QtWidgets.QFrame()
         headerFrame.setLayout(headerLayout)
         headerFrame.setStyleSheet(
-            f"QFrame {{ background-color: {color.value}; color: #000; }}"
+            f"QFrame {{ background-color: {color}; color: #000; }}"
         )
 
         self.body.layout().addWidget(headerFrame)
@@ -167,7 +183,9 @@ class ShaderNode(GraphNode):
                         ):
                             continue
 
-            rowWidget, nameWidget = MakePortWidget(i, PortType.INPUT)
+            rowWidget, nameWidget = MakePortWidget(
+                i, PortType.INPUT, self.colors.nodeBackgroundColor
+            )
 
             portLayout.addWidget(rowWidget)
 
@@ -177,7 +195,9 @@ class ShaderNode(GraphNode):
         if props:
             for p in props:
                 name = p.GetBaseName()
-                rowWidget, nameWidget = MakePropertyWidget(p)
+                rowWidget, nameWidget = MakePropertyWidget(
+                    p, self.colors.nodeBackgroundColor
+                )
                 portLayout.addWidget(rowWidget)
                 self.inputPortWidgets[name] = nameWidget
 
@@ -185,7 +205,9 @@ class ShaderNode(GraphNode):
             name = i.GetBaseName()
 
             if self.nodeType == NodeType.PARENT_INPUTS:
-                rowWidget, nameWidget = MakePortWidget(i, PortType.OUTPUT)
+                rowWidget, nameWidget = MakePortWidget(
+                    i, PortType.OUTPUT, self.colors.nodeBackgroundColor
+                )
                 portLayout.addWidget(rowWidget)
                 self.outputPortWidgets[name] = rowWidget
 
@@ -237,8 +259,10 @@ class ShaderNode(GraphNode):
         shaderOrNG=None,
         props=None,
         showAllOutputPorts=False,
+        colors=None,
     ):
-        super().__init__()
+        colors = colors if colors is not None else GraphColors()
+        super().__init__(colors)
 
         self.ngChangeCallback = ngChangeCallback
         self.shaderOrNG = shaderOrNG
@@ -284,7 +308,7 @@ class ShaderNode(GraphNode):
             auxButtonText = ""
             auxButtonTooltip = ""
 
-        headerColor = NodeColors[self.nodeType]
+        headerColor = self.colors.GetNodeColor(self.nodeType)
 
         self.AddHeader(
             nodeName, typeName, headerColor, auxButtonText, auxButtonTooltip
@@ -301,7 +325,9 @@ class ShaderNode(GraphNode):
         return descriptors
 
 
-def MakeSdrShaderNode(prim, ngChangeCallback, showAllOutputPorts=False):
+def MakeSdrShaderNode(
+    prim, ngChangeCallback, showAllOutputPorts=False, colors=None
+):
     shaderOrNG = UsdShade.Shader(prim)
     if not shaderOrNG:
         shaderOrNG = UsdShade.NodeGraph(prim)
@@ -326,14 +352,19 @@ def MakeSdrShaderNode(prim, ngChangeCallback, showAllOutputPorts=False):
         shaderOrNG,
         props,
         showAllOutputPorts,
+        colors,
     )
 
 
-def MakeNgInputNode(nodeGraph, inputs):
+def MakeNgInputNode(nodeGraph, inputs, colors=None):
     nodeName = nodeGraph.GetPrim().GetName()
-    return ShaderNode(nodeName, NodeType.PARENT_INPUTS, [], inputs)
+    return ShaderNode(
+        nodeName, NodeType.PARENT_INPUTS, [], inputs, colors=colors
+    )
 
 
-def MakeNgOutputNode(nodeGraph, outputs):
+def MakeNgOutputNode(nodeGraph, outputs, colors=None):
     nodeName = nodeGraph.GetPrim().GetName()
-    return ShaderNode(nodeName, NodeType.PARENT_OUTPUTS, outputs, [])
+    return ShaderNode(
+        nodeName, NodeType.PARENT_OUTPUTS, outputs, [], colors=colors
+    )

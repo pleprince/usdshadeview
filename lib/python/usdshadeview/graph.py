@@ -27,8 +27,7 @@ from .constants import (
     DEFAULT_FIT_VIEW_MARGIN,
     DEFAULT_NODE_VERTICAL_SPACING,
     MAX_NODE_GRAPH_DEPTH,
-    SPLINE_COLOR,
-    UIColors,
+    GraphColors,
 )
 from .nodes import (
     GraphNode,
@@ -48,6 +47,7 @@ class GraphView(QtWidgets.QGraphicsView):
 
         self.fitViewMargin = DEFAULT_FIT_VIEW_MARGIN
         self.hideScrollbars = False
+        self.colors = GraphColors()
 
         self.setDragMode(QtWidgets.QGraphicsView.ScrollHandDrag)
         self.setRenderHints(
@@ -164,7 +164,7 @@ class GraphView(QtWidgets.QGraphicsView):
         return self.fitViewMargin
 
     def SetFitViewMargin(self, margin):
-        self.fitViewMargin = max(0.0, float(margin))
+        self.fitViewMargin = max(0, margin)
 
     def GetHideScrollbars(self):
         return self.hideScrollbars
@@ -179,14 +179,23 @@ class GraphView(QtWidgets.QGraphicsView):
         self.setHorizontalScrollBarPolicy(policy)
         self.setVerticalScrollBarPolicy(policy)
 
+    def GetColors(self):
+        return self.colors
+
+    def SetColors(self, colors):
+        self.colors = colors
+        self.viewport().update()
+
     def drawBackground(self, painter, rect):
         # Fill background; needed for HW acceleleration
         viewportRect = self.viewport().rect()
         sceneRect = self.mapToScene(viewportRect).boundingRect()
-        painter.fillRect(sceneRect, QtGui.QColor(UIColors.CHARCOAL))
+        painter.fillRect(
+            sceneRect, QtGui.QColor(self.colors.backgroundColor)
+        )
 
         # Draw grid lines
-        lineColor = QtGui.QColor(UIColors.DARK_GREY)
+        lineColor = QtGui.QColor(self.colors.gridColor)
         painter.setPen(lineColor)
         lineSpacing = 28
 
@@ -217,11 +226,13 @@ class GraphWidget(QtWidgets.QWidget):
         self.graphRoot = None
         self.showAllOutputPorts = False
         self.nodeVerticalSpacing = DEFAULT_NODE_VERTICAL_SPACING
+        self.colors = GraphColors()
         self.portMarkers = []
         self.portMarkerNodeMap = {}
         self.portMarkerUpdatePending = False
 
         self.graphView = GraphView()
+        self.graphView.SetColors(self.colors)
 
         layout = QtWidgets.QVBoxLayout()
         layout.addWidget(self.graphView)
@@ -362,7 +373,7 @@ class GraphWidget(QtWidgets.QWidget):
         for ngPrim, (depth, inputNames) in self.parentNgInputMap.items():
             nodeGraph = UsdShade.NodeGraph(ngPrim)
             ngInputs = [nodeGraph.GetInput(name) for name in inputNames]
-            node = MakeNgInputNode(nodeGraph, ngInputs)
+            node = MakeNgInputNode(nodeGraph, ngInputs, self.colors)
 
             columnIndex = maxDepth - depth - 1
             self.parentNgNodeMap[ngPrim] = AddNodeToColumn(
@@ -374,10 +385,13 @@ class GraphWidget(QtWidgets.QWidget):
             if prim == directParentPrim:
                 nodeGraph = UsdShade.NodeGraph(prim)
                 outputs = nodeGraph.GetOutputs()
-                node = MakeNgOutputNode(prim, outputs)
+                node = MakeNgOutputNode(prim, outputs, self.colors)
             else:
                 node = MakeSdrShaderNode(
-                    prim, self.ngChangeCallback, self.showAllOutputPorts
+                    prim,
+                    self.ngChangeCallback,
+                    self.showAllOutputPorts,
+                    self.colors,
                 )
 
             columnIndex = maxDepth - depth - 1
@@ -426,7 +440,11 @@ class GraphWidget(QtWidgets.QWidget):
             inputPortName = port.GetBaseName()
 
             line = SplineConnectionWidget(
-                startNode, outputPortName, endNode, inputPortName
+                startNode,
+                outputPortName,
+                endNode,
+                inputPortName,
+                self.colors.connectionColor,
             )
             self.scene.addItem(line)
 
@@ -494,7 +512,7 @@ class GraphWidget(QtWidgets.QWidget):
         for portType, name in node.GetPortDescriptors():
             marker = QtWidgets.QGraphicsPolygonItem()
             marker.setPen(QtGui.QPen(QtCore.Qt.NoPen))
-            marker.setBrush(QtGui.QColor(SPLINE_COLOR))
+            marker.setBrush(QtGui.QColor(self.colors.connectionColor))
             marker.setAcceptedMouseButtons(QtCore.Qt.NoButton)
             marker.setZValue(2)
             self.scene.addItem(marker)
@@ -594,7 +612,14 @@ class GraphWidget(QtWidgets.QWidget):
         return self.nodeVerticalSpacing
 
     def SetNodeVerticalSpacing(self, spacing):
-        self.nodeVerticalSpacing = max(0.0, float(spacing))
+        self.nodeVerticalSpacing = max(0, spacing)
+
+    def GetColors(self):
+        return self.colors
+
+    def SetColors(self, colors):
+        self.colors = colors
+        self.graphView.SetColors(colors)
 
     def FrameNodes(self, nodes):
         if self.scene is None:

@@ -57,7 +57,7 @@ The network shown in the panel has a layout depending on network topology, and n
 
 Nodes can be selected by clicking them; hold **Shift** to select multiple. Press **F** to frame the selected nodes and **A** to frame the whole graph. Use the mouse wheel (centered on the cursor) or the **+** and **-** keys to zoom in and out. These shortcuts only apply while the panel is focused or under the cursor, so they do not interfere with usdview's own **F** shortcut.
 
-The margin used when framing, the vertical spacing between nodes and whether the view scrollbars are hidden can be changed under _Tools_ → _Preferences..._ and are remembered across sessions. Framing also happens automatically when a material is displayed and when the filter output changes. Output ports with default names such as `out` or `result` are hidden by default; enable _Show all output ports_ in the preferences to always display them on nodes.
+The margin used when framing, the vertical spacing between nodes, whether the view scrollbars are hidden and the colors of nodes, connections, background and background grid can be changed under _Tools_ → _Preferences..._ and are remembered across sessions. Framing also happens automatically when a material is displayed and when the filter output changes. Output ports with default names such as `out` or `result` are hidden by default; enable _Show all output ports_ in the preferences to always display them on nodes.
 
 It is also possible to **right click** value widgets, which exposes following actions:
 

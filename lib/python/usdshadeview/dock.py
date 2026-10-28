@@ -29,6 +29,7 @@ from .constants import (
     DEFAULT_FIT_VIEW_MARGIN,
     DEFAULT_NODE_VERTICAL_SPACING,
     DEFAULT_SHOW_NODE_GRAPH_SHORTCUT,
+    GraphColors,
 )
 from .dialogs import BakeMtlxDialog, PreferencesDialog
 from .graph import GraphWidget
@@ -66,6 +67,7 @@ class GraphDockWidget(QtWidgets.QDockWidget):
             self.graphWidget.GetHideScrollbars(),
             self.graphWidget.GetShowAllOutputPorts(),
             self.showNodeGraphShortcut,
+            self.graphWidget.GetColors(),
         )
         if dialog.Run() != QtWidgets.QDialog.Accepted:
             return
@@ -80,10 +82,15 @@ class GraphDockWidget(QtWidgets.QDockWidget):
         )
         self.graphWidget.SetNodeVerticalSpacing(nodeVerticalSpacing)
 
+        colors = dialog.GetColors()
+        colorsChanged = colors != self.graphWidget.GetColors()
+        self.graphWidget.SetColors(colors)
+
         showAllOutputPorts = dialog.GetShowAllOutputPorts()
         if (
             showAllOutputPorts == self.graphWidget.GetShowAllOutputPorts()
             and not spacingChanged
+            and not colorsChanged
         ):
             return
 
@@ -290,12 +297,18 @@ class UsdShadeViewDockState(StateSource):
         self.fitViewMargin = self.stateProperty(
             "fitViewMargin",
             default=DEFAULT_FIT_VIEW_MARGIN,
-            validator=lambda value: value >= 0.0,
+            validator=lambda value: value >= 0,
         )
         self.nodeVerticalSpacing = self.stateProperty(
             "nodeVerticalSpacing",
             default=DEFAULT_NODE_VERTICAL_SPACING,
-            validator=lambda value: value >= 0.0,
+            validator=lambda value: value >= 0,
+        )
+        self.graphColors = self.stateProperty(
+            "graphColors",
+            default=GraphColors().ToDict(),
+            propType=dict,
+            validator=lambda value: isinstance(value, dict),
         )
         self.hideScrollbars = self.stateProperty(
             "hideScrollbars", default=False
@@ -327,6 +340,9 @@ class UsdShadeViewDockState(StateSource):
             self._dockWidget.graphWidget.SetNodeVerticalSpacing(
                 self.nodeVerticalSpacing
             )
+            self._dockWidget.graphWidget.SetColors(
+                GraphColors.FromDict(self.graphColors)
+            )
             self._dockWidget.graphWidget.SetHideScrollbars(self.hideScrollbars)
             self._dockWidget.graphWidget.SetShowAllOutputPorts(
                 self.showAllOutputPorts
@@ -349,6 +365,7 @@ class UsdShadeViewDockState(StateSource):
         graphWidget = self._dockWidget.graphWidget
         state["fitViewMargin"] = graphWidget.GetFitViewMargin()
         state["nodeVerticalSpacing"] = graphWidget.GetNodeVerticalSpacing()
+        state["graphColors"] = graphWidget.GetColors().ToDict()
         state["hideScrollbars"] = graphWidget.GetHideScrollbars()
         state["showAllOutputPorts"] = graphWidget.GetShowAllOutputPorts()
         state["showNodeGraphShortcut"] = (

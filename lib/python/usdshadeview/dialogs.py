@@ -23,6 +23,7 @@ from pxr.Usdviewq.qt import QtCore, QtGui, QtWidgets
 from pxr.Usdviewq.scalarTypes import ToString
 
 from .compat import PySideModule, UsdBakeMtlx
+from .constants import GraphColors, NodeType
 
 
 class BakeMtlxDialog(QtWidgets.QDialog):
@@ -315,6 +316,55 @@ def OpenNodeDefDialog(ndId):
         d.show()
 
 
+NODE_COLOR_LABELS = [
+    (NodeType.USDA, "USDA node color:"),
+    (NodeType.MDL, "MDL node color:"),
+    (NodeType.MTLX, "MaterialX node color:"),
+    (NodeType.OSL, "OSL node color:"),
+    (NodeType.NODE_GRAPH, "Node graph color:"),
+    (NodeType.UNKNOWN, "Unknown node color:"),
+]
+
+
+class ColorButton(QtWidgets.QPushButton):
+    """A button showing a color swatch and opening a color picker."""
+
+    def __init__(self, color, parent=None):
+        super().__init__(parent)
+        self.color = QtGui.QColor(color)
+        self.setFixedWidth(110)
+        self.setToolTip("Click to choose a color.")
+        self.clicked.connect(self.PickColor)
+        self.UpdateSwatch()
+
+    def GetColor(self):
+        return self.color.name()
+
+    def SetColor(self, color):
+        self.color = QtGui.QColor(color)
+        self.UpdateSwatch()
+
+    def UpdateSwatch(self):
+        color = self.color
+        luminance = (
+            0.299 * color.red() + 0.587 * color.green() + 0.114 * color.blue()
+        ) / 255.0
+        textColor = "#000" if luminance > 0.5 else "#fff"
+        self.setText(color.name())
+        self.setStyleSheet(
+            f"QPushButton {{ background-color: {color.name()}; "
+            f"color: {textColor}; border: 1px solid #000; "
+            "padding: 2px 4px; }"
+        )
+
+    def PickColor(self):
+        color = QtWidgets.QColorDialog.getColor(
+            self.color, self, "Select Color"
+        )
+        if color.isValid():
+            self.SetColor(color)
+
+
 class PreferencesDialog(QtWidgets.QDialog):
     def __init__(
         self,
@@ -324,6 +374,7 @@ class PreferencesDialog(QtWidgets.QDialog):
         hideScrollbars,
         showAllOutputPorts,
         showNodeGraphShortcut,
+        colors,
     ):
         super().__init__(parent)
 
@@ -341,10 +392,9 @@ class PreferencesDialog(QtWidgets.QDialog):
             "Show Node Graph shortcut:", self.showNodeGraphShortcut
         )
 
-        self.fitViewMargin = QtWidgets.QDoubleSpinBox()
-        self.fitViewMargin.setRange(0.0, 200.0)
-        self.fitViewMargin.setDecimals(1)
-        self.fitViewMargin.setSingleStep(5.0)
+        self.fitViewMargin = QtWidgets.QSpinBox()
+        self.fitViewMargin.setRange(0, 200)
+        self.fitViewMargin.setSingleStep(5)
         self.fitViewMargin.setValue(fitViewMargin)
         self.fitViewMargin.setSuffix(" px")
         self.fitViewMargin.setToolTip(
@@ -352,10 +402,9 @@ class PreferencesDialog(QtWidgets.QDialog):
         )
         formLayout.addRow("Fit view margin:", self.fitViewMargin)
 
-        self.nodeVerticalSpacing = QtWidgets.QDoubleSpinBox()
-        self.nodeVerticalSpacing.setRange(0.0, 200.0)
-        self.nodeVerticalSpacing.setDecimals(1)
-        self.nodeVerticalSpacing.setSingleStep(1.0)
+        self.nodeVerticalSpacing = QtWidgets.QSpinBox()
+        self.nodeVerticalSpacing.setRange(0, 200)
+        self.nodeVerticalSpacing.setSingleStep(1)
         self.nodeVerticalSpacing.setValue(nodeVerticalSpacing)
         self.nodeVerticalSpacing.setSuffix(" px")
         self.nodeVerticalSpacing.setToolTip(
@@ -376,8 +425,30 @@ class PreferencesDialog(QtWidgets.QDialog):
             "default names such as 'out' or 'result'."
         )
 
+        colorsGroup = QtWidgets.QGroupBox("Colors")
+        colorsLayout = QtWidgets.QFormLayout(colorsGroup)
+
+        self.nodeColorButtons = {}
+        for nodeType, label in NODE_COLOR_LABELS:
+            button = ColorButton(colors.GetNodeColor(nodeType))
+            self.nodeColorButtons[nodeType.name] = button
+            colorsLayout.addRow(label, button)
+
+        self.nodeBackgroundColor = ColorButton(colors.nodeBackgroundColor)
+        colorsLayout.addRow("Node background color:", self.nodeBackgroundColor)
+
+        self.connectionColor = ColorButton(colors.connectionColor)
+        colorsLayout.addRow("Connection color:", self.connectionColor)
+
+        self.backgroundColor = ColorButton(colors.backgroundColor)
+        colorsLayout.addRow("Background color:", self.backgroundColor)
+
+        self.gridColor = ColorButton(colors.gridColor)
+        colorsLayout.addRow("Background grid color:", self.gridColor)
+
         layout = QtWidgets.QVBoxLayout()
         layout.addLayout(formLayout)
+        layout.addWidget(colorsGroup)
         layout.addWidget(self.hideScrollbars)
         layout.addWidget(self.showAllOutputPorts)
 
@@ -396,6 +467,18 @@ class PreferencesDialog(QtWidgets.QDialog):
 
     def GetNodeVerticalSpacing(self):
         return self.nodeVerticalSpacing.value()
+
+    def GetColors(self):
+        return GraphColors(
+            nodeColors={
+                key: button.GetColor()
+                for key, button in self.nodeColorButtons.items()
+            },
+            connectionColor=self.connectionColor.GetColor(),
+            backgroundColor=self.backgroundColor.GetColor(),
+            gridColor=self.gridColor.GetColor(),
+            nodeBackgroundColor=self.nodeBackgroundColor.GetColor(),
+        )
 
     def GetHideScrollbars(self):
         return self.hideScrollbars.isChecked()

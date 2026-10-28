@@ -25,7 +25,13 @@ from pxr.Usdviewq.qt import QtCore, QtGui, QtWidgets
 from pxr.Usdviewq.scalarTypes import ToClipboard, ToString
 
 from .compat import PySideModule, oiio, oiioSupported
-from .constants import ARRAY_BUTTON_STYLE, BORDER_WIDGET_STYLE, PortType
+from .constants import (
+    ARRAY_BUTTON_STYLE,
+    MakeBorderWidgetStyle,
+    MakeNodeBackgroundStyle,
+    PortType,
+    UIColors,
+)
 from .dialogs import OpenMetadataDialog, ShowValueArrayDialog
 from .utils import (
     FormatFloatShort,
@@ -93,13 +99,20 @@ class ValueProxyWidget(QtWidgets.QWidget):
             OpenFileInFolderWithSystem(filePath)
 
 
-def MakeValueProxyWidget(widget, value, nodeInput):
+def MakeValueProxyWidget(
+    widget,
+    value,
+    nodeInput,
+    nodeBackgroundColor: str = UIColors.CHARCOAL.value,
+):
     layout = QtWidgets.QHBoxLayout()
     layout.setContentsMargins(0, 0, 0, 0)
     layout.addWidget(widget)
 
     proxy = ValueProxyWidget(value, nodeInput)
     proxy.setLayout(layout)
+    proxy.setObjectName("NodeBackground")
+    proxy.setStyleSheet(MakeNodeBackgroundStyle(nodeBackgroundColor))
     return proxy
 
 
@@ -136,7 +149,9 @@ class AlphaWidget(QtWidgets.QLabel):
         painter.drawRect(borderRect)
 
 
-def MakeColorValueWidget(value, isColor4):
+def MakeColorValueWidget(
+    value, isColor4, nodeBackgroundColor: str = UIColors.CHARCOAL.value
+):
     valueLayout = QtWidgets.QHBoxLayout()
     valueLayout.setSpacing(6)
     valueLayout.setContentsMargins(0, 0, 0, 0)
@@ -170,8 +185,8 @@ def MakeColorValueWidget(value, isColor4):
 
     labelWidget = QtWidgets.QLabel(labelStr)
     labelWidget.setAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
-    labelWidget.setStyleSheet(BORDER_WIDGET_STYLE)
     labelWidget.setObjectName("ThisWidget")
+    labelWidget.setStyleSheet(MakeBorderWidgetStyle(nodeBackgroundColor))
     labelWidget.setToolTip(tooltipStr)
     valueLayout.addWidget(labelWidget)
 
@@ -196,6 +211,8 @@ def MakeColorValueWidget(value, isColor4):
 
     valueWidget = QtWidgets.QWidget()
     valueWidget.setLayout(valueLayout)
+    valueWidget.setObjectName("NodeBackground")
+    valueWidget.setStyleSheet(MakeNodeBackgroundStyle(nodeBackgroundColor))
 
     return (
         QtCore.Qt.Horizontal if isNormalized else QtCore.Qt.Vertical,
@@ -212,7 +229,9 @@ def PixmapToBase64(pixmap):
     return base64.b64encode(buffer.data()).decode("ascii")
 
 
-def MakeAssetValueWidget(value):
+def MakeAssetValueWidget(
+    value, nodeBackgroundColor: str = UIColors.CHARCOAL.value
+):
     valueStr = value.resolvedPath
     if not valueStr:
         valueStr = value.path  # fall back to unresolved path
@@ -224,8 +243,8 @@ def MakeAssetValueWidget(value):
     labelWidget = QtWidgets.QLabel(shortValueStr)
     labelWidget.setAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
     labelWidget.setContentsMargins(0, 0, 0, 0)
-    labelWidget.setStyleSheet(BORDER_WIDGET_STYLE)
     labelWidget.setObjectName("ThisWidget")
+    labelWidget.setStyleSheet(MakeBorderWidgetStyle(nodeBackgroundColor))
     labelWidget.setToolTip(valueStr)
 
     valueLayout = QtWidgets.QHBoxLayout()
@@ -280,8 +299,8 @@ def MakeAssetValueWidget(value):
         imgView.setPixmap(pixmap)
         imgView.setScaledContents(True)  # downsample instead of crop
         imgView.setFixedSize(16, 16)
-        imgView.setStyleSheet(BORDER_WIDGET_STYLE)
         imgView.setObjectName("ThisWidget")
+        imgView.setStyleSheet(MakeBorderWidgetStyle(nodeBackgroundColor))
         imgView.setToolTip(
             f'<img width={imgSize} height={imgSize} src="data:image/png;base64,{base64Str}" />'
         )
@@ -290,11 +309,15 @@ def MakeAssetValueWidget(value):
 
     valueWidget = QtWidgets.QWidget()
     valueWidget.setLayout(valueLayout)
+    valueWidget.setObjectName("NodeBackground")
+    valueWidget.setStyleSheet(MakeNodeBackgroundStyle(nodeBackgroundColor))
 
     return QtCore.Qt.Vertical, valueWidget
 
 
-def MakeVectorValueWidget(value):
+def MakeVectorValueWidget(
+    value, nodeBackgroundColor: str = UIColors.CHARCOAL.value
+):
     valueStr = ToString(value)
 
     layout = QtWidgets.QHBoxLayout()
@@ -331,8 +354,8 @@ def MakeVectorValueWidget(value):
     widget = QtWidgets.QWidget()
     widget.setLayout(layout)
     widget.setToolTip(valueStr)
-    widget.setStyleSheet(BORDER_WIDGET_STYLE)
     widget.setObjectName("ThisWidget")
+    widget.setStyleSheet(MakeBorderWidgetStyle(nodeBackgroundColor))
 
     orientation = QtCore.Qt.Horizontal
 
@@ -344,7 +367,9 @@ def MakeVectorValueWidget(value):
     return orientation, widget
 
 
-def MakeMatrixValueWidget(value):
+def MakeMatrixValueWidget(
+    value, nodeBackgroundColor: str = UIColors.CHARCOAL.value
+):
     gridLayout = QtWidgets.QGridLayout()
     gridLayout.setContentsMargins(6, 6, 6, 6)
 
@@ -363,8 +388,8 @@ def MakeMatrixValueWidget(value):
     widget = QtWidgets.QWidget()
     widget.setLayout(gridLayout)
     widget.setToolTip(ToString(value))
-    widget.setStyleSheet(BORDER_WIDGET_STYLE)
     widget.setObjectName("ThisWidget")
+    widget.setStyleSheet(MakeBorderWidgetStyle(nodeBackgroundColor))
 
     return widget
 
@@ -411,7 +436,9 @@ def MakeArrayValueWidget(value):
     return button
 
 
-def MakeValueWidget(value, typeName):
+def MakeValueWidget(
+    value, typeName, nodeBackgroundColor: str = UIColors.CHARCOAL.value
+):
 
     isColor3 = typeName in {
         Sdf.ValueTypeNames.Color3f,
@@ -466,13 +493,19 @@ def MakeValueWidget(value, typeName):
     orientation = QtCore.Qt.Horizontal
 
     if isColor3 or isColor4:
-        orientation, widget = MakeColorValueWidget(value, isColor4)
+        orientation, widget = MakeColorValueWidget(
+            value, isColor4, nodeBackgroundColor
+        )
     elif isMatrix:
-        widget = MakeMatrixValueWidget(value)
+        widget = MakeMatrixValueWidget(value, nodeBackgroundColor)
     elif isVector:
-        orientation, widget = MakeVectorValueWidget(value)
+        orientation, widget = MakeVectorValueWidget(
+            value, nodeBackgroundColor
+        )
     elif typeName == Sdf.ValueTypeNames.Asset:
-        orientation, widget = MakeAssetValueWidget(value)
+        orientation, widget = MakeAssetValueWidget(
+            value, nodeBackgroundColor
+        )
     elif typeName.isArray:
         widget = MakeArrayValueWidget(value)
     else:
@@ -493,13 +526,20 @@ def MakeValueWidget(value, typeName):
         widget = QtWidgets.QLabel(valueStr)
         widget.setToolTip(toolTipStr)
         widget.setAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
-        widget.setStyleSheet(BORDER_WIDGET_STYLE)
         widget.setObjectName("ThisWidget")
+        widget.setStyleSheet(MakeBorderWidgetStyle(nodeBackgroundColor))
 
     return orientation, widget
 
 
-def MakePortRowWidget(name, typeName, value, port, portType):
+def MakePortRowWidget(
+    name,
+    typeName,
+    value,
+    port,
+    portType,
+    nodeBackgroundColor: str = UIColors.CHARCOAL.value,
+):
     nameRlAlign = (
         QtCore.Qt.AlignRight
         if portType == PortType.OUTPUT
@@ -513,9 +553,13 @@ def MakePortRowWidget(name, typeName, value, port, portType):
     if value is None or (port is not None and port.HasConnectedSource()):
         return nameWidget, nameWidget
 
-    orientation, valueWidget = MakeValueWidget(value, typeName)
+    orientation, valueWidget = MakeValueWidget(
+        value, typeName, nodeBackgroundColor
+    )
 
-    valueWidget = MakeValueProxyWidget(valueWidget, value, port)
+    valueWidget = MakeValueProxyWidget(
+        valueWidget, value, port, nodeBackgroundColor
+    )
 
     if orientation == QtCore.Qt.Horizontal:
         rowLayout = QtWidgets.QHBoxLayout()
@@ -529,19 +573,29 @@ def MakePortRowWidget(name, typeName, value, port, portType):
 
     rowWidget = QtWidgets.QWidget()
     rowWidget.setLayout(rowLayout)
+    rowWidget.setObjectName("NodeBackground")
+    rowWidget.setStyleSheet(MakeNodeBackgroundStyle(nodeBackgroundColor))
 
     return rowWidget, nameWidget
 
 
-def MakePortWidget(port, portType):
+def MakePortWidget(
+    port, portType, nodeBackgroundColor: str = UIColors.CHARCOAL.value
+):
     name = port.GetBaseName()
     typeName = port.GetTypeName()
     value = None if type(port) == UsdShade.Output else port.Get()
-    return MakePortRowWidget(name, typeName, value, port, portType)
+    return MakePortRowWidget(
+        name, typeName, value, port, portType, nodeBackgroundColor
+    )
 
 
-def MakePropertyWidget(attr):
+def MakePropertyWidget(
+    attr, nodeBackgroundColor: str = UIColors.CHARCOAL.value
+):
     name = attr.GetBaseName()
     typeName = attr.GetTypeName()
     value = attr.Get()
-    return MakePortRowWidget(name, typeName, value, None, PortType.INPUT)
+    return MakePortRowWidget(
+        name, typeName, value, None, PortType.INPUT, nodeBackgroundColor
+    )

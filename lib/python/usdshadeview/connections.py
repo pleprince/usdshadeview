@@ -22,7 +22,9 @@ from .constants import SPLINE_COLOR, PortType
 
 
 class ConnectionWidget:
-    def __init__(self, startNode, outputName, endNode, inputName):
+    def __init__(
+        self, startNode, outputName, endNode, inputName, color=SPLINE_COLOR
+    ):
         super().__init__()
         self.startNode = startNode
         self.endNode = endNode
@@ -32,16 +34,14 @@ class ConnectionWidget:
         self.startNode.geometryChanged.connect(self.UpdateGeometry)
         self.endNode.geometryChanged.connect(self.UpdateGeometry)
 
-        self.setPen(QtGui.QPen(QtGui.QColor(SPLINE_COLOR), 1.0))
+        self.setPen(QtGui.QPen(QtGui.QColor(color), 1.0))
         self.UpdateGeometry()
 
     def UpdateGeometry(self):
         outputPos = self.startNode.GetPortPosition(
             self.outputName, PortType.OUTPUT
         )
-        inputPos = self.endNode.GetPortPosition(
-            self.inputName, PortType.INPUT
-        )
+        inputPos = self.endNode.GetPortPosition(self.inputName, PortType.INPUT)
 
         startPos = self.startNode.mapToScene(outputPos)
         endPos = self.endNode.mapToScene(inputPos)

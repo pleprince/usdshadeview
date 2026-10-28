@@ -41,6 +41,7 @@ from .constants import (
     DEFAULT_NODE_VERTICAL_SPACING,
     MAX_NODE_GRAPH_DEPTH,
     SELECTED_NODE_STYLE,
+    GraphColors,
     NodeColors,
     NodeType,
     PortType,
