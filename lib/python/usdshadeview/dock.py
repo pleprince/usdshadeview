@@ -204,17 +204,19 @@ class GraphDockWidget(QtWidgets.QDockWidget):
         self.contentLayout.setMenuBar(menuBar)
 
     def BackToParentNodeGraph(self):
+        if not self.historyStack:
+            return
         self.nodeGraph, self.selectedOutput = self.historyStack.pop()
-        self.RefreshContent()
+        self.UpdateContentForOutput()
 
     def SwitchToOutput(self, output):
         if output == self.selectedOutput:
             return  # Already showing, don't reset viewport
         self.selectedOutput = output
-        self.RefreshContent()
+        self.UpdateContentForOutput()
 
     def RefreshContent(self):
-        """Rebuilds the scene and frames it once the view is laid out."""
+        """Frames the graph once the pending layout has been processed."""
         # Frame once the pending layout/resize has been processed, so that
         # the viewport size used for framing is already the final one.
         QtCore.QTimer.singleShot(0, self.graphWidget.FrameAll)
