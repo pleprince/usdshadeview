@@ -29,7 +29,9 @@ from .constants import (
     DEFAULT_NODE_VERTICAL_SPACING,
     DEFAULT_SHOW_ALL_OUTPUT_PORTS,
     MAX_NODE_GRAPH_DEPTH,
+    NODE_TYPE_LABELS,
     GraphColors,
+    UIColors,
 )
 from .nodes import (
     GraphNode,
@@ -194,9 +196,7 @@ class GraphView(QtWidgets.QGraphicsView):
         # Fill background; needed for HW acceleleration
         viewportRect = self.viewport().rect()
         sceneRect = self.mapToScene(viewportRect).boundingRect()
-        painter.fillRect(
-            sceneRect, QtGui.QColor(self.colors.backgroundColor)
-        )
+        painter.fillRect(sceneRect, QtGui.QColor(self.colors.backgroundColor))
 
         # Draw grid lines
         lineColor = QtGui.QColor(self.colors.gridColor)
@@ -214,6 +214,81 @@ class GraphView(QtWidgets.QGraphicsView):
         while lineY < rect.bottom():
             painter.drawLine(rect.left(), lineY, rect.right(), lineY)
             lineY += lineSpacing
+
+        self.DrawNodeLegend(painter)
+
+    def DrawNodeLegend(self, painter):
+        """Draws the node header color legend in the viewport's bottom-left."""
+        if not isinstance(painter.device(), QtWidgets.QWidget):
+            return
+
+        entries = [
+            (NODE_TYPE_LABELS.get(key, key), color)
+            for key, color in self.colors.nodeColors.items()
+        ]
+        if not entries:
+            return
+
+        painter.save()
+
+        font = painter.font()
+        font.setPointSizeF(8.0)
+        painter.setFont(font)
+
+        metrics = painter.fontMetrics()
+        rowHeight = max(14, metrics.height() + 4)
+        swatchSize = 10
+        gap = 6
+        padding = 8
+        labels = [label for label, _ in entries]
+        textWidth = max(metrics.horizontalAdvance(label) for label in labels)
+        panelWidth = padding * 2 + swatchSize + gap + textWidth
+        panelHeight = padding * 2 + rowHeight * len(entries)
+
+        viewportRect = self.viewport().rect()
+        panelRect = QtCore.QRectF(
+            viewportRect.left() + 12,
+            viewportRect.bottom() - panelHeight - 12,
+            panelWidth,
+            panelHeight,
+        )
+
+        painter.resetTransform()
+        painter.setPen(QtCore.Qt.NoPen)
+        painter.setBrush(QtGui.QColor(0, 0, 0, 64))
+        painter.drawRoundedRect(panelRect, 4, 4)
+
+        textColor = QtGui.QColor(UIColors.LIGHT_GREY.value)
+        swatchPen = QtGui.QPen(QtGui.QColor("#000"))
+
+        rowY = panelRect.top() + padding
+        for label, color in entries:
+            swatchRect = QtCore.QRectF(
+                panelRect.left() + padding,
+                rowY + (rowHeight - swatchSize) / 2.0,
+                swatchSize,
+                swatchSize,
+            )
+            painter.setPen(swatchPen)
+            painter.setBrush(QtGui.QColor(color))
+            painter.drawRect(swatchRect)
+
+            painter.setPen(textColor)
+            textRect = QtCore.QRectF(
+                swatchRect.right() + gap,
+                rowY,
+                textWidth,
+                rowHeight,
+            )
+            painter.drawText(
+                textRect,
+                QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
+                label,
+            )
+
+            rowY += rowHeight
+
+        painter.restore()
 
 
 class GraphWidget(QtWidgets.QWidget):
@@ -425,9 +500,7 @@ class GraphWidget(QtWidgets.QWidget):
             )
 
             columnIndex = maxDepth - depth - 1
-            self.parentNgNodeMap[ngPrim] = AddNodeToColumn(
-                node, columnIndex
-            )
+            self.parentNgNodeMap[ngPrim] = AddNodeToColumn(node, columnIndex)
 
         # Insert all previously traversed nodes
         for prim, depth in self.nodeMap.items():
@@ -453,7 +526,7 @@ class GraphWidget(QtWidgets.QWidget):
 
             self.primNodeMap[prim] = AddNodeToColumn(node, columnIndex)
 
-        for i in range(0, maxDepth):
+        for i in range(maxDepth):
             column = columns[i]
 
             if column.count() == 0:

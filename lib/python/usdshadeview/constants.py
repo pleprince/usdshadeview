@@ -62,6 +62,16 @@ class NodeType(Enum):
     UNKNOWN = 8
 
 
+NODE_TYPE_LABELS = {
+    NodeType.USDA.name: "USDA",
+    NodeType.MDL.name: "MDL",
+    NodeType.MTLX.name: "MaterialX",
+    NodeType.OSL.name: "OSL",
+    NodeType.NODE_GRAPH.name: "Node Graph",
+    NodeType.UNKNOWN.name: "Unknown",
+}
+
+
 def MakeBorderWidgetStyle(
     backgroundColor: str = UIColors.CHARCOAL.value,
     borderColor: str = "#000",
